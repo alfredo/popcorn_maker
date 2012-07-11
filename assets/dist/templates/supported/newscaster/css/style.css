@@ -17,7 +17,7 @@ body {
 
 .logo, .cube h2{
   font-family: "Bree Serif", Georgia, sans-serif;
-  font-weight: 700;
+  font-weight: 400;
   letter-spacing: .05em;
 }
 
@@ -36,7 +36,7 @@ h3 {
 }
 
 /*- - - Header- - -*/
-header { 
+header {
   position: relative;
   margin-bottom: 20px;
   padding: 70px 0 20px 0;
@@ -157,20 +157,20 @@ section.suplementary p:hover {
   position: absolute;
   right: 0;
   bottom: -10px;
-  -webkit-transform: scale(0.6,0.6);
-  -webkit-perspective: 200; 
+  -webkit-transform: scale(0.8,0.8);
+  -webkit-perspective: 200;
   -webkit-perspective-origin: 50% 50px;
   -moz-transform: scale(0.8,0.8);
-  -moz-perspective: 200; 
+  -moz-perspective: 200px;
   -moz-perspective-origin: 50% 50px;
   -o-transform: scale(0.8,0.8);
-  -o-perspective: 200; 
+  -o-perspective: 200;
   -o-perspective-origin: 50% 50px;
   -ms-transform: scale(0.8,0.8);
-  -ms-perspective: 200; 
+  -ms-perspective: 200;
   -ms-perspective-origin: 50% 50px;
   transform: scale(0.8,0.8);
-  perspective: 200; 
+  perspective: 200;
   perspective-origin: 50% 50px;
   z-index: 1000;
 }
@@ -241,7 +241,7 @@ section.suplementary p:hover {
   color: #121212;
   font-size: 1em;
   line-height: 1em;
-}   
+}
 
 .cube > div > div {
   display: table;

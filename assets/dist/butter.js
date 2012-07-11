@@ -1401,6 +1401,7 @@ define('util/dragndrop',[], function(){
         _droppable = null,
         _draggable = {
           destroy: function(){
+            _draggable.selected = false;
             element.removeEventListener( "mousedown", onMouseDown, false );
           }
         },
@@ -1800,9 +1801,6 @@ define('ui/page-element',[ "core/logger", "core/eventmanager", "util/dragndrop",
         _highlightElement.style.visibility = "visible";
         _highlightElement.classList.add( "on" );
         _highlightElement.classList.remove( "blink" );
-        _highlightElement.removeEventListener( 'transitionend', onTransitionEnd, false );
-        _highlightElement.removeEventListener( 'oTransitionEnd', onTransitionEnd, false );
-        _highlightElement.removeEventListener( 'webkitTransitionEnd', onTransitionEnd, false );
       }
       else {
         _this.blink = _blinkFunction;
@@ -1853,9 +1851,6 @@ define('ui/page-element',[ "core/logger", "core/eventmanager", "util/dragndrop",
         _highlightElement.classList.remove( "on" );
         _this.blink = _blinkFunction;
       }
-      _highlightElement.removeEventListener( 'transitionend', onTransitionEnd, false );
-      _highlightElement.removeEventListener( 'oTransitionEnd', onTransitionEnd, false );
-      _highlightElement.removeEventListener( 'webkitTransitionEnd', onTransitionEnd, false );
     }
 
     this.blink = _blinkFunction = function(){
@@ -1865,9 +1860,7 @@ define('ui/page-element',[ "core/logger", "core/eventmanager", "util/dragndrop",
         _highlightElement.classList.add( "blink", "true" );
       }, 0);
       _highlightElement.style.visibility = "visible";
-      _highlightElement.addEventListener( 'transitionend', onTransitionEnd, false );
-      _highlightElement.addEventListener( 'oTransitionEnd', onTransitionEnd, false );
-      _highlightElement.addEventListener( 'webkitTransitionEnd', onTransitionEnd, false );
+      setTimeout( onTransitionEnd, 1500 );
     }; //blink
 
     if( _element ){
@@ -2099,6 +2092,7 @@ define('core/views/trackevent-view',[ "core/logger", "core/eventmanager", "util/
         _draggable,
         _resizable,
         _trackEvent = trackEvent,
+        _dragging = false,
         _this = this;
 
     EventManagerWrapper( _this );
@@ -2179,6 +2173,12 @@ define('core/views/trackevent-view',[ "core/logger", "core/eventmanager", "util/
           } //if
         }
       },
+      dragging: {
+        enumerable: true,
+        get: function(){
+          return _dragging;
+        }
+      },
       zoom: {
         enumerable: true,
         get: function(){
@@ -2224,14 +2224,17 @@ define('core/views/trackevent-view',[ "core/logger", "core/eventmanager", "util/
                 containment: _parent.element.parentNode,
                 scroll: _parent.element.parentNode.parentNode,
                 start: function(){
+                  _dragging = true;
                   _this.dispatch( "trackeventdragstarted" );
                 },
                 stop: function(){
+                  _dragging = false;
                   _this.dispatch( "trackeventdragstopped" );
                   movedCallback();
                 },
                 revert: true
               });
+              _draggable.selected = _trackEvent.selected;
 
               _resizable = DragNDrop.resizable( _element, {
                 containment: _parent.element.parentNode,
@@ -2240,7 +2243,7 @@ define('core/views/trackevent-view',[ "core/logger", "core/eventmanager", "util/
               });
 
               _element.setAttribute( "data-butter-draggable-type", "trackevent" );
-              _element.setAttribute( "data-butter-trackevent-id", trackEvent.id );
+              _element.setAttribute( "data-butter-trackevent-id", _trackEvent.id );
 
               if( !_handles ){
                 _handles = _element.querySelectorAll( ".handle" );
@@ -2281,28 +2284,31 @@ define('core/views/trackevent-view',[ "core/logger", "core/eventmanager", "util/
     _this.update( inputOptions );
 
     _element.addEventListener( "mousedown", function ( e ) {
-      _this.dispatch( "trackeventmousedown", { originalEvent: e, trackEvent: trackEvent } );
+      _this.dispatch( "trackeventmousedown", { originalEvent: e, trackEvent: _trackEvent } );
     }, true);
     _element.addEventListener( "mouseup", function ( e ) {
-      _this.dispatch( "trackeventmouseup", { originalEvent: e, trackEvent: trackEvent } );
+      _this.dispatch( "trackeventmouseup", { originalEvent: e, trackEvent: _trackEvent } );
     }, false);
     _element.addEventListener( "mouseover", function ( e ) {
-      _this.dispatch( "trackeventmouseover", { originalEvent: e, trackEvent: trackEvent } );
+      _this.dispatch( "trackeventmouseover", { originalEvent: e, trackEvent: _trackEvent } );
     }, false );
     _element.addEventListener( "mouseout", function ( e ) {
-      _this.dispatch( "trackeventmouseout", { originalEvent: e, trackEvent: trackEvent } );
+      _this.dispatch( "trackeventmouseout", { originalEvent: e, trackEvent: _trackEvent } );
     }, false );
 
     _element.addEventListener( "dblclick", function ( e ) {
-      _this.dispatch( "trackeventdoubleclicked", { originalEvent: e, trackEvent: trackEvent } );
+      _this.dispatch( "trackeventdoubleclicked", { originalEvent: e, trackEvent: _trackEvent } );
+    }, false);
+    _element.addEventListener( "click", function ( e ) {
+      _this.dispatch( "trackeventclicked", { originalEvent: e, trackEvent: _trackEvent } );
     }, false);
 
-    function select( e ){
+    function select() {
       _draggable.selected = true;
       _element.setAttribute( "selected", true );
     } //select
 
-    function deselect( e ) {
+    function deselect() {
       _draggable.selected = false;
       _element.removeAttribute( "selected" );
     } //deselect
@@ -2362,7 +2368,7 @@ define('core/views/track-view',[ "core/logger",
             _this.dispatch( "plugindropped", {
               start: start,
               track: _track,
-              type: dropped.getAttribute( "data-butter-plugin-type" )
+              type: dropped.getAttribute( "data-popcorn-plugin-type" )
             });
           }
           else if( draggableType === "trackevent" ) {
@@ -2473,9 +2479,136 @@ define('core/views/track-view',[ "core/logger",
 /* This Source Code Form is subject to the terms of the MIT license
  * If a copy of the MIT license was not distributed with this file, you can
  * obtain one at http://www.mozillapopcorn.org/butter-license.txt */
+
+define('util/uri',[], function(){
+
+  // -------------------------------------------------------------
+  // parseUri 1.2.2
+  // (c) Steven Levithan <stevenlevithan.com>
+  // http://blog.stevenlevithan.com/archives/parseuri
+  // MIT License
+
+  function parseUri( str ){
+    var o   = parseUri.options,
+        m   = o.parser[ o.strictMode ? "strict" : "loose" ].exec( str ),
+        uri = {},
+        i   = 14;
+
+    while( i-- ){
+      uri[ o.key[ i ] ] = m[ i ] || "";
+    }
+
+    uri[ o.q.name ] = {};
+    uri[ o.key[ 12 ] ].replace( o.q.parser, function( $0, $1, $2 ){
+      if ($1){
+        uri[ o.q.name ][ $1 ] = $2;
+      }
+    });
+
+    return uri;
+  }
+
+  parseUri.options = {
+    strictMode: false,
+    key: [
+      "source","protocol","authority","userInfo","user","password",
+      "host","port","relative","path","directory","file","query","anchor"
+    ],
+    q:   {
+      name:   "queryKey",
+      parser: /(?:^|&)([^&=]*)=?([^&]*)/g
+    },
+    parser: {
+      strict: /^(?:([^:\/?#]+):)?(?:\/\/((?:(([^:@]*)(?::([^:@]*))?)?@)?([^:\/?#]*)(?::(\d*))?))?((((?:[^?#\/]*\/)*)([^?#]*))(?:\?([^#]*))?(?:#(.*))?)/,
+      loose:  /^(?:(?![^:@]+:[^:@\/]*@)([^:\/?#.]+):)?(?:\/\/)?((?:(([^:@]*)(?::([^:@]*))?)?@)?([^:\/?#]*)(?::(\d*))?)(((\/(?:[^?#](?![^?#\/]*\.[^?#\/.]+(?:[?#]|$)))*\/?)?([^?#\/]*))(?:\?([^#]*))?(?:#(.*))?)/
+    }
+  };
+
+  // -------------------------------------------------------------
+
+  // Unique key name for query string
+  var UID_KEY_NAME = "butteruid";
+
+  // A default seed that won't collide.
+  var seed = Date.now();
+
+  // Reconstruct a URI from its parts as a string.
+  function uriToString( uri ){
+    var s = "";
+
+    // XXX: need to figure out proper rules/exceptions for adding //
+    s += uri.protocol ? uri.protocol + "://" : "";
+    s += uri.authority || "";
+    s += uri.path || "";
+    s += uri.query ? "?" + uri.query : "";
+    s += uri.anchor ? "#" + uri.anchor : "";
+
+    return s;
+  }
+
+  var URI = {
+
+    // Allow overriding the initial seed (mostly for testing).
+    set seed( value ){
+      seed = value|0;
+    },
+    get seed(){
+      return seed;
+    },
+
+    // Parse a string into a URI object.
+    parse: function( uriString ){
+      var uri = parseUri( uriString );
+      uri.toString = function(){
+        return uriToString( this );
+      };
+      return uri;
+    },
+
+    // Make a URI object (or URI string, turned into a URI object) unique.
+    // This will turn http://foo.com into http://foo.com?<UID_KEY_NAME>=<seed number++>.
+    makeUnique: function( uriObject ){
+      var key,
+          value,
+          queryKey,
+          queryString = "",
+          queryKeyCount = 0;
+
+      if( typeof uriObject === "string" ){
+        uriObject = this.parse( uriObject );
+      }
+
+      queryKey = uriObject.queryKey;
+
+      queryKey[ UID_KEY_NAME ] = seed++;
+
+      // Update query string to reflect change
+      for( key in queryKey ){
+        if( queryKey.hasOwnProperty( key ) ){
+          value = queryKey[ key ];
+          queryString += queryKeyCount > 0 ? "&" : "";
+          queryString += key;
+          // Allow value=0
+          queryString += ( !!value || value === 0 ) ? "=" + value : "";
+          queryKeyCount++;
+        }
+      }
+      uriObject.query = queryString;
+
+      return uriObject;
+    }
+  };
+
+  return URI;
+
+});
+
+/* This Source Code Form is subject to the terms of the MIT license
+ * If a copy of the MIT license was not distributed with this file, you can
+ * obtain one at http://www.mozillapopcorn.org/butter-license.txt */
 /*jshint evil:true*/
 
-define('core/popcorn-wrapper',[ "core/logger", "core/eventmanager" ], function( Logger, EventManager ) {
+define('core/popcorn-wrapper',[ "core/logger", "core/eventmanager", "util/uri" ], function( Logger, EventManager, URI ) {
 
   // regex to determine the type of player we need to use based on the provided url
   var __urlRegex = /(?:http:\/\/www\.|http:\/\/|www\.|\.|^)(youtu|vimeo|soundcloud|baseplayer)/;
@@ -2691,14 +2824,17 @@ define('core/popcorn-wrapper',[ "core/logger", "core/eventmanager" ], function( 
         if( [ "VIDEO", "AUDIO" ].indexOf( targetElement.nodeName ) !== -1 ) {
           var parentNode = targetElement.parentNode,
               newElement = document.createElement( "div" ),
+              videoAttributes = [ "controls", "preload", "autoplay", "loop", "muted", "poster", "src" ],
               attributes;
 
           newElement.id = targetElement.id;
           attributes = targetElement.attributes;
-          if( attributes ){
+          if ( attributes ) {
             for( var i = attributes.length - 1; i >= 0; i-- ) {
               var name = attributes[ i ].nodeName;
-              newElement.setAttribute( name, targetElement.getAttribute( name ) );
+              if ( videoAttributes.indexOf( name ) === -1 ) {
+                newElement.setAttribute( name, targetElement.getAttribute( name ) );
+              }
             }
           }
           if( targetElement.className ){
@@ -2725,12 +2861,15 @@ define('core/popcorn-wrapper',[ "core/logger", "core/eventmanager" ], function( 
           i,
           option;
 
-      if ( typeof( url ) !== "string" ) {
-        url = JSON.stringify( url );
+      // Chrome currently won't load multiple copies of the same video.
+      // See http://code.google.com/p/chromium/issues/detail?id=31014.
+      // Munge the url so we get a unique media resource key.
+      url = typeof url === "string" ? [ url ] : url;
+      for( i=0; i<url.length; i++ ){
+        url[ i ] = URI.makeUnique( url[ i ] ).toString();
       }
-      else {
-        url = "'" + url + "'";
-      }
+      // Transform into a string of URLs (i.e., array string)
+      url = JSON.stringify( url );
 
       // prepare popcornOptions as a string
       if ( popcornOptions ) {
@@ -3292,613 +3431,6 @@ define('core/page',[ "core/logger", "core/eventmanager" ], function( Logger, Eve
  * If a copy of the MIT license was not distributed with this file, you can
  * obtain one at http://www.mozillapopcorn.org/butter-license.txt */
 
-
-/**
- * Module: Comm
- *
- * Allows communication between entities through postMessage.
- */
-define('core/comm',[ "./eventmanager" ], function( EventManagerWrapper ){
-
-  var __context = 1;
-
-  /**
-   * Class: Comm
-   *
-   * Lets entities communicate when communication restrictions exist by passing messages through postMessage.
-   *
-   * @param {Window} clientWindow: Window from/to which to send/receive messages
-   * @param {Function} readyCallback: Function to be called when link is set up
-   */
-  var Comm = function( clientWindow, readyCallback ) {
-    var _this = this,
-        _readyInterval,
-        _context = __context++,
-        _destroyed = false,
-        _ponged = false;
-
-    EventManagerWrapper( _this );
-
-    clientWindow.addEventListener( "message", function( e ){
-      if( e.source === clientWindow && typeof e.data === "object" && e.data.context ){
-        if( e.data.type === "pong" ){
-          _ponged = true;
-        }
-        else {
-          _this.dispatch( e.data.type, e.data.data );
-        } //if
-      } //if
-    }, false );
-
-    function checkPing(){
-      if( !_destroyed ){
-        if( !_ponged ){
-          _this.dispatch( "error", {
-            type: "connectionclosed"
-          });
-        } //if
-        ping();
-      } //if
-    } //checkPing
-
-    function ping(){
-      _ponged = false;
-      _this.send( "ping" );
-      setTimeout( checkPing, 1000 );
-    } //ping
-
-    _this.listen( "ready", function( e ){
-      clearInterval( _readyInterval );
-      readyCallback();
-      ping();
-    });
-
-    _readyInterval = setInterval( function(){
-      _this.send( "ready", "ready" );
-    }, 100 );
-
-    this.send = function( type, data ){
-      clientWindow.postMessage({
-        type: type,
-        context: _context,
-        data: data
-      }, "*" );
-    }; //send
-
-    this.destroy = function(){
-      _destroyed = true;
-      clearInterval( _readyInterval );
-    }; //destroy
-  }; //Comm
-
-  return Comm;
-});
-
-/* This Source Code Form is subject to the terms of the MIT license
- * If a copy of the MIT license was not distributed with this file, you can
- * obtain one at http://www.mozillapopcorn.org/butter-license.txt */
-
-define('dialog/modal',[], function(){
-
-  var __container;
-
-  return function( state ){
-
-    if( !__container ){
-      __container = document.createElement( "div" );
-      __container.id = "butter-modal-container";
-      __container.setAttribute( "data-butter-exclude", true );
-      document.body.appendChild( __container );
-    } //if
-
-    var _element = document.createElement( "div" );
-
-    _element.className = "layer";
-
-    if( state && typeof( state ) === "string" ){
-      _element.className += state;
-    } //if
-
-    __container.appendChild( _element );
-
-    // need to wait an event-loop cycle to apply this class
-    // ow, opacity transition fails to render
-    setTimeout( function(){
-      _element.className += " fade-in";
-    }, 10 );
-
-    this.destroy = function(){
-      __container.removeChild( _element );
-    }; //destroy
-
-    Object.defineProperties( this, {
-      element: {
-        enumerable: true,
-        get: function(){
-          return _element;
-        }
-      }
-    });
-
-  }; //Modal
-
-});
-
-/* This Source Code Form is subject to the terms of the MIT license
- * If a copy of the MIT license was not distributed with this file, you can
- * obtain one at http://www.mozillapopcorn.org/butter-license.txt */
-
-define('dialog/iframe-dialog',[
-          "core/comm",
-          "core/eventmanager",
-          "dialog/modal"
-        ],
-        function( Comm, EventManagerWrapper, Modal ){
-
-  return function( dialogOptions ) {
-    dialogOptions = dialogOptions || {};
-
-    if( !dialogOptions.url ){
-      throw new Error( "IFRAME dialog requires a url." );
-    } //if
-
-    var _this = this,
-        _url = dialogOptions.url,
-        _parent = dialogOptions.parent,
-        _classes = dialogOptions.classes || "fade-in",
-        _open = false,
-        _iframe,
-        _commQueue = [],
-        _comm,
-        _modalLayer,
-        _listeners = dialogOptions.events || {};
-
-    EventManagerWrapper( _this );
-
-    this.modal = dialogOptions.modal;
-
-    function onSubmit( e ){
-      _this.dispatch( e.type, e.data );
-    } //onSubmit
-
-    function onCancel( e ){
-      _this.dispatch( e.type, e.data );
-      _this.close();
-    } //onCancel
-
-    this.close = function(){
-      // Send a close message to the dialog first, then actually close the dialog.
-      // A setTimeout is used here to ensure that its associated function will be run
-      // almost right after the postMessage happens. This ensures that messages get to
-      // their destination before we remove the dom element (which will basically ruin
-      // everything) by placing callbacks in the browser's event loop in the correct order.
-      _this.send( "close" );
-      setTimeout( function(){
-        _parent.removeChild( _iframe );
-        if( _modalLayer ){
-          _modalLayer.destroy();
-          _modalLayer = undefined;
-        } //if
-        _comm.unlisten( "submit", onSubmit );
-        _comm.unlisten( "cancel", onCancel );
-        _comm.unlisten( "close", _this.close );
-        _comm.destroy();
-        _open = false;
-        window.removeEventListener( "beforeunload",  _this.close, false );
-        for( var e in _listeners ){
-          if( e !== "close" ){
-            _this.unlisten( e, _listeners[ e ] );
-          }
-        } //for
-        _this.dispatch( "close" );
-        _this.unlisten( "close", _listeners.close );
-      }, 0 );
-    }; //close
-
-    this.open = function( listeners ){
-      if( _open ){
-        return;
-      } //if
-      if( _this.modal ){
-        _modalLayer = new Modal( _this.modal );
-      } //if
-      for( var e in listeners ){
-        if( listeners.hasOwnProperty( e ) ){
-          _listeners[ e ] = listeners[ e ];
-        }
-      } //for
-      var defaultParent = _modalLayer ? _modalLayer.element : document.body;
-      _parent = _parent || defaultParent;
-      _iframe = document.createElement( "iframe" );
-      _iframe.src = _url;
-      _iframe.addEventListener( "load", function( e ){
-        _comm = new Comm( _iframe.contentWindow, function(){
-          _comm.listen( "submit", onSubmit );
-          _comm.listen( "cancel", onCancel );
-          _comm.listen( "close", _this.close );
-          window.addEventListener( "beforeunload",  _this.close, false );
-          for( var e in _listeners ){
-            if( _listeners.hasOwnProperty( e ) ){
-              _this.listen( e, _listeners[ e ] );
-            }
-          } //for
-          while( _commQueue.length > 0 ){
-            var popped = _commQueue.pop();
-            _this.send( popped.type, popped.data );
-          } //while
-          _open = true;
-          // Immediately set focus
-          setTimeout( function() {
-            _this.focus();
-          }, 0 );
-          _this.dispatch( "open" );
-        });
-      }, false );
-      _parent.appendChild( _iframe );
-
-      // need to wait an event-loop cycle to apply this class
-      // ow, opacity transition fails to render
-      setTimeout( function(){
-        _iframe.className += " " + _classes.trim();
-      }, 10 );
-    }; //open
-
-    this.send = function( type, data ){
-      if( _comm ){
-        _comm.send( type, data );
-      }
-      else {
-        _commQueue.push({ type: type, data: data });
-      } //if
-    }; //send
-
-    this.focus = function() {
-      _iframe.contentWindow.focus();
-    }; //focus
-
-    Object.defineProperties( this, {
-      iframe: {
-        enumerable: true,
-        get: function(){
-          return _iframe;
-        }
-      },
-      closed: {
-        enumerable: true,
-        get: function(){
-          return !_open;
-        }
-      }
-    });
-  }; //IFrameDialog
-});
-
-/* This Source Code Form is subject to the terms of the MIT license
- * If a copy of the MIT license was not distributed with this file, you can
- * obtain one at http://www.mozillapopcorn.org/butter-license.txt */
-
-define('dialog/window-dialog',[
-          "core/comm",
-          "core/eventmanager",
-          "dialog/modal"
-        ],
-        function( Comm, EventManagerWrapper, Modal ){
-
-  var DEFAULT_WINDOW_WIDTH = 640,
-      DEFAULT_WINDOW_HEIGHT = 479,
-      WINDOW_CHECK_INTERVAL = 300;
-
-  return function( dialogOptions ) {
-    dialogOptions = dialogOptions || {};
-
-    if( !dialogOptions.url ){
-      throw new Error( "Window dialog requires a url." );
-    } //if
-
-    var _this = this,
-        _url = dialogOptions.url,
-        _comm,
-        _window,
-        _modalLayer,
-        _statusInterval,
-        _commQueue = [],
-        _open = false,
-        _features = [
-          "width=" + ( dialogOptions.width || DEFAULT_WINDOW_WIDTH ),
-          "height=" + ( dialogOptions.height || DEFAULT_WINDOW_HEIGHT ),
-          "toolbar=no",
-          "menubar=no",
-          "titlebar=yes",
-          "location=no",
-          "resizable=yes"
-        ],
-        _listeners = dialogOptions.events || {};
-
-    EventManagerWrapper( _this );
-
-    _this.modal = dialogOptions.modal;
-
-    function onSubmit( e ){
-      _this.dispatch( e.type, e.data );
-    } //onSubmit
-
-    function onCancel( e ){
-      _this.dispatch( e.type, e.data );
-      _this.close();
-    } //onCancel
-
-    function onError( e ){
-      if( e.data.type === "connectionclosed" ){
-        _this.close();
-      } //if
-      _this.dispatch( "error", e.data );
-    } //onError
-
-    this.close = function(){
-      // Send a close message to the dialog first, then actually close the dialog.
-      // A setTimeout is used here to ensure that its associated function will be run
-      // almost right after the postMessage happens. This ensures that messages get to
-      // their destination before we remove the dom element (which will basically ruin
-      // everything) by placing callbacks in the browser's event loop in the correct order.
-      _this.send( "close" );
-      setTimeout( function(){
-        if( _modalLayer ){
-          _modalLayer.destroy();
-          _modalLayer = undefined;
-        } //if
-        _comm.unlisten( "submit", onSubmit );
-        _comm.unlisten( "cancel", onCancel );
-        _comm.unlisten( "close", _this.close );
-        _comm.destroy();
-        if( _window.close ){
-          _window.close();
-        } //if
-        clearInterval( _statusInterval );
-        window.removeEventListener( "beforeunload",  _this.close, false );
-        _comm = _window = undefined;
-        _open = false;
-        for( var e in _listeners ){
-          if( _listeners.hasOwnProperty( e ) ){
-            _this.unlisten( e, _listeners[ e ] );
-          }
-        } //for
-        _this.dispatch( "close" );
-      }, 0 );
-    }; //close
-
-    function checkWindowStatus(){
-      if( _window && _window.closed === true ) {
-        _this.close();
-      } //if
-    } //checkWindowStatus
-
-    this.open = function( listeners ){
-      if( _this.modal ){
-        _modalLayer = new Modal( _this.modal );
-      } //if
-      for ( var e in listeners ){
-        if( listeners.hasOwnProperty( e ) ){
-          _listeners[ e ] = listeners[ e ];
-        }
-      } //for
-      _window = window.open( _url, "dialog-window:" + _url, _features.join( "," ) );
-      window.addEventListener( "beforeunload",  _this.close, false );
-      _comm = new Comm( _window, function(){
-        _comm.listen( "error", onError );
-        _comm.listen( "submit", onSubmit );
-        _comm.listen( "cancel", onCancel );
-        _comm.listen( "close", _this.close );
-        for( var e in _listeners ){
-          if( _listeners.hasOwnProperty( e ) ){
-            _this.listen( e, _listeners[ e ] );
-          }
-        } //for
-        _statusInterval = setInterval( checkWindowStatus, WINDOW_CHECK_INTERVAL );
-        while( _commQueue.length > 0 ){
-          var popped = _commQueue.pop();
-          _this.send( popped.type, popped.data );
-        } //while
-        _open = true;
-        _this.dispatch( "open" );
-      });
-    }; //open
-
-    this.focus = function() {
-      _window.focus();
-    };
-
-    this.send = function( type, data ){
-      if( _comm ){
-        _comm.send( type, data );
-      }
-      else {
-        _commQueue.push({ type: type, data: data });
-      } //if
-    }; //send
-
-    Object.defineProperties( this, {
-      closed: {
-        enumerable: true,
-        get: function(){
-          return !_open;
-        }
-      }
-    });
-
-  }; //WindowDialog
-
-});
-
-/* This Source Code Form is subject to the terms of the MIT license
- * If a copy of the MIT license was not distributed with this file, you can
- * obtain one at http://www.mozillapopcorn.org/butter-license.txt */
-
-define('editor/editor',[ "core/eventmanager", "dialog/iframe-dialog", "dialog/window-dialog", "util/time" ],
-        function( EventManagerWrapper, IFrameDialog, WindowDialog, TimeUtil ) {
-
-  var DEFAULT_DIMS = [ 400, 400 ],
-      DEFAULT_FRAME_TYPE = "iframe";
-
-  function Editor( butter, source, type, frameType, parentElement, options ){
-    options = options || {};
-
-    var _frameType = frameType || DEFAULT_FRAME_TYPE,
-        _type = type,
-        _dims = DEFAULT_DIMS.slice(),
-        _dialog,
-        _dialogOptions = {
-          type: _frameType,
-          modal: "behind-timeline",
-          url: source,
-          parent: parentElement
-        },
-        _currentTarget,
-        _currentTrackEvent,
-        _this = this;
-
-    EventManagerWrapper( _this );
-
-    _dims[ 0 ] = options.width || _dims[ 0 ];
-    _dims[ 1 ] = options.height || _dims[ 1 ];
-
-    function blinkTarget(){
-      if( _currentTarget === butter.currentMedia.target ){
-        butter.currentMedia.view.blink();
-      }
-      else{
-        var target = butter.getTargetByType( "elementID", _currentTarget );
-        if( target ){
-          target.view.blink();
-        } //if
-      } //if
-    }
-
-    function onTrackEventUpdated( e ){
-      var popcornData = _currentTrackEvent.popcornOptions;
-      if( popcornData.target !== _currentTarget ){
-        _currentTarget = popcornData.target;
-        blinkTarget();
-      } //if
-      _dialog.send( "trackeventupdated", _currentTrackEvent.popcornOptions );
-    } //onTrackEventUpdated
-
-    function onTrackEventUpdateFailed( e ){
-      _dialog.send( "trackeventupdatefailed", e.data );
-    } //onTrackEventUpdateFailed
-
-    function onClose(){
-      _dialog = null;
-      _currentTrackEvent.unlisten( "trackeventupdated", onTrackEventUpdated );
-      _currentTrackEvent.unlisten( "trackeventupdatefailed", onTrackEventUpdateFailed );
-      _this.dispatch( "close" );
-    }
-
-    this.open = function( trackEvent ) {
-      if( !_dialog ){
-        if( _frameType === "window" ){
-          _dialog = new WindowDialog( _dialogOptions );
-        }
-        else{
-          _dialog = new IFrameDialog( _dialogOptions );
-        } //if
-      } //if
-
-      if( !_dialog.closed && _dialog.focus ){
-        _dialog.focus();
-        return;
-      } //if
-
-      _currentTrackEvent = trackEvent;
-
-      _dialog.open({
-        open: function( e ){
-          var targets = [],
-              media = {
-                name: butter.currentMedia.name,
-                target: butter.currentMedia.target
-              };
-          for( var i = 0, l = butter.targets.length; i < l; i++ ) {
-            targets.push( butter.targets[ i ].element.id );
-          }
-          var corn = trackEvent.popcornOptions;
-          _dialog.send( "trackeventdata", {
-            manifest: Popcorn.manifest[ trackEvent.type ],
-            popcornOptions: corn,
-            targets: targets,
-            media: media
-          });
-          _currentTarget = corn.target;
-          blinkTarget();
-          trackEvent.listen( "trackeventupdated", onTrackEventUpdated );
-          trackEvent.listen( "trackeventupdatefailed", onTrackEventUpdateFailed );
-          _this.dispatch( "open" );
-        },
-        submit: function( e ){
-          var popcornData = e.data.eventData,
-              alsoClose = e.data.alsoClose;
-          if( popcornData ){
-            trackEvent.update( popcornData );
-            if( alsoClose ){
-              _dialog.close();
-            } //if
-          } //if
-        },
-        close: function( e ){
-          onClose();
-        }
-      });
-    }; //open
-
-    this.close = function(){
-      if( _currentTrackEvent && _dialog ){
-        _dialog.close();
-      }
-    };
-
-    Object.defineProperties( _this, {
-      isOpen: {
-        enumerable: true,
-        get: function(){
-          return !!_dialog;
-        }
-      },
-      type: {
-        enumerable: true,
-        get: function(){
-          return _type;
-        }
-      },
-      frame: {
-        enumerable: true,
-        get: function(){
-          return _frameType;
-        }
-      },
-      size: {
-        enumerable: true,
-        get: function(){
-          return { width: _dims[ 0 ], height: _dims[ 1 ] };
-        },
-        set: function( val ){
-          val = val || {};
-          _dims[ 0 ] = val.width || _dims[ 0 ];
-          _dims[ 1 ] = val.height || _dims[ 1 ];
-        }
-      }
-    });
-
-  } //Editor
-
-  return Editor;
-
-});
-
-
-
-/* This Source Code Form is subject to the terms of the MIT license
- * If a copy of the MIT license was not distributed with this file, you can
- * obtain one at http://www.mozillapopcorn.org/butter-license.txt */
-
 define('timeline/track-container',[
   "core/logger",
   "util/dragndrop"
@@ -3942,7 +3474,7 @@ function(
           newTrack.view.dispatch( "plugindropped", {
             start: start,
             track: newTrack,
-            type: dropped.getAttribute( "data-butter-plugin-type" )
+            type: dropped.getAttribute( "data-popcorn-plugin-type" )
           });
         }
       }
@@ -4441,7 +3973,7 @@ define('timeline/scrubber',[], function(){
     hScrollbar.listen( "scroll", setNodePosition );
 
     function onMouseUp( e ){
-      if( _isPlaying ){
+      if( _isPlaying || _isScrubbing ){
         _media.play();
         _isScrubbing = false;
       }
@@ -4681,20 +4213,20 @@ define('timeline/status',[], function(){
 
     function update(){
       if( _state ){
-        _icon.removeAttribute( "state" );
+        _icon.removeAttribute( "data-state" );
       }
       else {
-        _icon.setAttribute( "state", true );
+        _icon.setAttribute( "data-state", true );
       } //if
     } //update
 
     function onMouseUp( e ){
-      _button.removeAttribute( "mouse-state" );
+      _button.removeAttribute( "data-mouse-state" );
       window.removeEventListener( "mouseup", onMouseUp, false );
     } //onMouseUp
 
     _button.addEventListener( "mousedown", function( e ){
-      _button.setAttribute( "mouse-state", "depressed" );
+      _button.setAttribute( "data-mouse-state", "depressed" );
       window.addEventListener( "mouseup", onMouseUp, false );
     }, false );
 
@@ -4872,223 +4404,6 @@ define('timeline/status',[], function(){
 
 });
 
-
-/* This Source Code Form is subject to the terms of the MIT license
- * If a copy of the MIT license was not distributed with this file, you can
- * obtain one at http://www.mozillapopcorn.org/butter-license.txt */
-
-define('timeline/trackhandles',[
-          "dialog/iframe-dialog",
-          "util/dragndrop"
-        ],
-        function( IFrameDialog, DragNDrop ){
-
-  var ADD_TRACK_BUTTON_Y_ADJUSTMENT = 37;
-
-  return function( butter, media, tracksContainer, orderChangedCallback ){
-
-    var _media = media,
-        _container = document.createElement( "div" ),
-        _listElement = document.createElement( "div" ),
-        _addTrackButton = document.createElement( "button" ),
-        _tracks = {},
-        _menus = [],
-        _this = this;
-
-    _container.className = "track-handle-container";
-    _listElement.className = "handle-list";
-
-    _container.appendChild( _listElement );
-
-    _addTrackButton.id = "add-track";
-    _addTrackButton.innerHTML = "<span class=\"icon icon-plus-sign\"></span> Track";
-    _addTrackButton.classList.add( "butter-btn" );
-    _addTrackButton.title = "Add a new Track for your events";
-
-    _container.appendChild( _addTrackButton );
-
-    _addTrackButton.addEventListener( "click", function( e ){
-      butter.currentMedia.addTrack();
-    }, false );
-
-    var _sortable = DragNDrop.sortable( _listElement, {
-      change: function( elements ){
-        var orderedTracks = [];
-        for( var i=0, l=elements.length; i<l; ++i ){
-          var id = elements[ i ].getAttribute( "data-butter-track-id" );
-          orderedTracks.push( _tracks[ id ].track );
-        }
-        orderChangedCallback( orderedTracks );
-      }
-    });
-
-    function onTrackAdded( e ){
-      var track = e.data,
-          trackId = track.id,
-          trackName = track.name,
-          trackDiv = document.createElement( "div" ),
-          menuDiv = document.createElement( "div" ),
-          deleteButton = document.createElement( "div" );
-
-      menuDiv.className = "menu";
-      deleteButton.className = "delete";
-      menuDiv.appendChild( deleteButton );
-
-      deleteButton.addEventListener( "click", function( e ){
-        var dialog = new IFrameDialog({
-          type: "iframe",
-          modal: true,
-          url: butter.ui.dialogDir + "delete-track.html",
-          events: {
-            open: function( e ){
-              dialog.send( "trackdata", trackName );
-            },
-            submit: function( e ){
-              if( e.data === true ){
-                media.removeTrack( track );
-              } //if
-              dialog.close();
-            },
-            cancel: function( e ){
-              dialog.close();
-            },
-            trackupdated: function( e ) {
-              dialog.send( "trackupdated", { success: false });
-            }
-          }
-        });
-        dialog.trackupdated = function( e ) {
-          console.log( "called", e );
-        };
-        dialog.open();
-      }, false );
-
-      trackDiv.addEventListener( "dblclick", function( e ){
-        var dialog = new IFrameDialog({
-          type: "iframe",
-          modal: true,
-          url: butter.ui.dialogDir + "track-data.html",
-          events: {
-            open: function( e ) {
-              dialog.send( "trackdata", track.json );
-            },
-            submit: function( e ) {
-              // wrap in a try catch so we know right away about any malformed JSON
-              try {
-                var trackData = JSON.parse( e.data ),
-                    trackEvents = track.trackEvents,
-                    trackDataEvents = trackData.trackEvents,
-                    dontRemove = {},
-                    toAdd = [],
-                    i,
-                    l;
-
-                trackDiv.childNodes[ 0 ].textContent = track.name = trackData.name;
-                // update every trackevent with it's new data
-                for ( i = 0, l = trackDataEvents.length; i < l; i++ ) {
-                  var teData = trackDataEvents[ i ],
-                      te = track.getTrackEventById( teData.id );
-
-                  // check to see if the current track event exists already
-                  if ( te ) {
-                    te.update( teData.popcornOptions );
-                    /* remove it from our reference to the array of track events so we know
-                     * which ones to remove later
-                     */
-                    dontRemove[ teData.id ] = teData;
-                  // if we couldn't find the track event, it must be a new one
-                  } else {
-                    toAdd.push( { type: teData.type, popcornOptions: teData.popcornOptions } );
-                  }
-                }
-
-                // remove all trackEvents that wern't updated
-                for ( i = trackEvents.length, l = 0; i >= l; i-- ) {
-                  if ( trackEvents[ i ] && !dontRemove[ trackEvents[ i ].id ] ) {
-                    track.removeTrackEvent( trackEvents[ i ] );
-                  }
-                }
-
-                // add all the trackEvents that didn't exist so far
-                for ( i = 0, l = toAdd.length; i < l; i++ ) {
-                  track.addTrackEvent( toAdd[ i ] );
-                }
-                // let the dialog know things went well
-                dialog.send( "trackupdated", true );
-              } catch ( error ) {
-                // inform the dialog about the issue
-                console.log( error );
-                dialog.send( "trackupdated", false );
-              }
-            }
-          }
-        });
-        dialog.open();
-      }, false );
-
-      _menus.push( menuDiv );
-
-      trackDiv.className = "track-handle";
-      trackDiv.id = "track-handle-" + trackId;
-      trackDiv.setAttribute( "data-butter-track-id", trackId );
-      trackDiv.appendChild( document.createTextNode( trackName ) );
-      trackDiv.appendChild( menuDiv );
-
-      _sortable.addItem( trackDiv );
-
-      _listElement.appendChild( trackDiv );
-
-      _tracks[ trackId ] = {
-        id: trackId,
-        track: track,
-        element: trackDiv,
-        menu: menuDiv
-      };
-
-      _addTrackButton.style.top = _listElement.offsetHeight - ADD_TRACK_BUTTON_Y_ADJUSTMENT + "px";
-    }
-
-    var existingTracks = _media.tracks;
-    for( var i=0; i<existingTracks.length; ++i ){
-      onTrackAdded({
-        data: existingTracks[ i ]
-      });
-    }
-
-    _media.listen( "trackadded", onTrackAdded );
-
-    _media.listen( "trackremoved", function( e ){
-      var trackId = e.data.id;
-      _listElement.removeChild( _tracks[ trackId ].element );
-      _sortable.removeItem( _tracks[ trackId ].element );
-      _menus.splice( _menus.indexOf( _tracks[ trackId ].menu ), 1 );
-      delete _tracks[ trackId ];
-      _addTrackButton.style.top = _listElement.offsetHeight - ADD_TRACK_BUTTON_Y_ADJUSTMENT + "px";
-    });
-
-    tracksContainer.element.addEventListener( "scroll", function( e ){
-      _container.scrollTop = tracksContainer.element.scrollTop;
-    }, false );
-
-    this.update = function(){
-      _container.scrollTop = tracksContainer.element.scrollTop;
-      _addTrackButton.style.top = _listElement.offsetHeight - ADD_TRACK_BUTTON_Y_ADJUSTMENT + "px";
-    }; //update
-
-    _this.update();
-
-    Object.defineProperties( this, {
-      element: {
-        enumerable: true,
-        get: function(){
-          return _container;
-        }
-      }
-    });
-
-  }; //TrackHandles
-
-});
 
 /* This Source Code Form is subject to the terms of the MIT license
  * If a copy of the MIT license was not distributed with this file, you can
@@ -5363,7 +4678,7 @@ define('util/scrollbars',[ "core/eventmanager" ], function( EventManagerWrapper 
  * obtain one at http://www.mozillapopcorn.org/butter-license.txt */
 
 define('plugin/plugin-list',[ "util/dragndrop" ], function( DragNDrop ){
-	
+
 	return function( butter ){
     var _parentElement = document.createElement( "div" ),
         _containerElement = document.createElement( "div" );
@@ -5407,7 +4722,7 @@ define('plugin/plugin-list',[ "util/dragndrop" ], function( DragNDrop ){
           }
         },
         stop: function(){
-          
+
         }
       });
 
@@ -5420,9 +4735,9 @@ define('plugin/plugin-list',[ "util/dragndrop" ], function( DragNDrop ){
       text.innerHTML = e.data.type;
       element.appendChild( text );
 
-      element.setAttribute( "data-butter-plugin-type", e.data.type );
+      element.setAttribute( "data-popcorn-plugin-type", e.data.type );
       element.setAttribute( "data-butter-draggable-type", "plugin" );
-      
+
       _containerElement.appendChild( element );
     });
 
@@ -5438,11 +4753,7 @@ define('plugin/plugin-list',[ "util/dragndrop" ], function( DragNDrop ){
 
 define('dependencies',[], function(){
 
-  var DEFAULT_DIRS = {
-        "popcorn-js": "../external/popcorn-js",
-        "css": "css"
-      },
-      VAR_REGEX = /\{([\w\-\._]+)\}/,
+  var VAR_REGEX = /\{([\w\-\._]+)\}/,
       CSS_POLL_INTERVAL = 10;
 
   var DEFAULT_CHECK_FUNCTION = function(){
@@ -5462,10 +4773,9 @@ define('dependencies',[], function(){
 
       while ( VAR_REGEX.test( url ) ) {
         match = VAR_REGEX.exec( url );
-        replacement = _configDirs[ match[ 1 ] ] || DEFAULT_DIRS[ match[ 1 ] ] || "";
+        replacement = _configDirs[ match[ 1 ] ] || "";
         url = url.replace( match[0], replacement );
       }
-
       return url.replace( "//", "/" );
     }
 
@@ -5591,38 +4901,114 @@ define('dependencies',[], function(){
  * If a copy of the MIT license was not distributed with this file, you can
  * obtain one at http://www.mozillapopcorn.org/butter-license.txt */
 
-define('ui/toggler',[], function(){
-  return function( butter, parentElement ){
-    var _butter = butter,
-        _parent = parentElement,
-        _element = document.createElement( "div" ),
-        _img = document.createElement( "div" ),
-        _this = this;
+define('dialog/modal',[], function(){
 
-    _element.id = "toggle-button";
-    _element.title = "Show/Hide Timeline";
-    _element.appendChild( _img );
-    _parent.appendChild( _element );
+  var __container = document.createElement( "div" );
 
-    _element.addEventListener( "click", function( e ){
-      _butter.ui.visible = !_butter.ui.visible;
-    }, false );
+  var Modal = function( childElement ){
 
-    Object.defineProperties( _this, {
-      visible: {
+    if( !__container.parentNode ){
+      __container.className = "butter-modal-container";
+      __container.setAttribute( "data-butter-exclude", true );
+      document.body.appendChild( __container );
+    }
+
+    var _element = document.createElement( "div" );
+    _element.classList.add( "layer" );
+    __container.appendChild( _element );
+
+    // need to wait an event-loop cycle to apply this class
+    // ow, opacity transition fails to render
+    setTimeout( function(){
+      if ( _element ) {
+        _element.classList.add( "fade-in" );
+      }
+    }, 10 );
+
+    _element.appendChild( childElement );
+
+    this.destroy = function(){
+      __container.removeChild( _element );
+      _element = null;
+    };
+
+    Object.defineProperties( this, {
+      element: {
         enumerable: true,
         get: function(){
-          return _element.style.display !== "none";
-        },
-        set: function( val ){
-          _element.style.display = val ? "block" : "none";
+          return _element;
         }
       }
     });
 
   };
+
+  Modal.element = __container;
+
+  return Modal;
+
 });
 
+define('util/keys',[], function() {
+  
+  return {
+
+    DELETE:     8,
+    TAB:        9,
+
+    ESCAPE:     27,
+
+    SPACE:      32,
+
+    LEFT:       37,
+    UP:         38,
+    RIGHT:      39,
+    DOWN:       40,
+
+    0:          48,
+    1:          49,
+    2:          50,
+    3:          51,
+    4:          52,
+    5:          53,
+    6:          54,
+    7:          55,
+    8:          56,
+    9:          57,
+
+    A:          65,
+    B:          66,
+    C:          67,
+    D:          68,
+    E:          69,
+    F:          70,
+    G:          71,
+    H:          72,
+    I:          73,
+    J:          74,
+    K:          75,
+    L:          76,
+    M:          77,
+    N:          78,
+    O:          79,
+    P:          80,
+    Q:          81,
+    R:          82,
+    S:          83,
+    T:          84,
+    U:          85,
+    V:          86,
+    W:          87,
+    X:          88,
+    Y:          89,
+    Z:          90,
+
+    EQUALS:     187,
+    MINUS:      189
+
+  };
+
+});
 define('ui/context-button',[], function(){
 
   return function( butter ){
@@ -5668,6 +5054,47 @@ define('ui/context-button',[], function(){
   };
 });
 
+define('ui/unload-dialog',[], function(){
+
+  return function( butter ){
+
+    var changed = false,
+        events = [
+          "mediacontentchanged",
+          "mediatargetchanged",
+          "trackadded",
+          "trackremoved",
+          "tracktargetchanged",
+          "trackeventadded",
+          "trackeventremoved",
+          "trackeventupdated"
+        ];
+
+    var areYouSure = function() {
+      return "You have unsaved project data.";
+    };
+
+    var eventFunction = function() {
+      if ( !changed ) {
+        changed = true;
+        window.onbeforeunload = areYouSure;
+      }
+    };
+
+    butter.listen( "ready", function() {
+      for ( var i = 0, el = events.length; i < el; i++ ) {
+        butter.listen( events[ i ], eventFunction );
+      }
+    });
+
+    butter.listen( "projectsaved", function() {
+      changed = false;
+      window.onbeforeunload = null;
+    });
+  };
+});
+
+
 /* This Source Code Form is subject to the terms of the MIT license
  * If a copy of the MIT license was not distributed with this file, you can
  * obtain one at http://www.mozillapopcorn.org/butter-license.txt */
@@ -5708,16 +5135,19 @@ define('ui/context-button',[], function(){
     }
 
     var XHR = {
-      "get": function(url, callback) {
+      "get": function( url, callback, mimeTypeOverride ) {
         var xhr = new XMLHttpRequest();
-        xhr.open("GET", url, true);
+        xhr.open( "GET", url, true );
         xhr.onreadystatechange = callback;
         xhr.setRequestHeader( "X-Requested-With", "XMLHttpRequest" );
-        xhr.send(null);
+        if( xhr.overrideMimeType && mimeTypeOverride ){
+          xhr.overrideMimeType( mimeTypeOverride );
+        }
+        xhr.send( null );
       },
-      "post": function(url, data, callback, type) {
+      "post": function( url, data, callback, type ) {
         var xhr = new XMLHttpRequest();
-        xhr.open("POST", url, true);
+        xhr.open( "POST", url, true );
         xhr.onreadystatechange = callback;
         xhr.setRequestHeader( "X-Requested-With", "XMLHttpRequest" );
         if ( csrf_token ) {
@@ -5725,7 +5155,7 @@ define('ui/context-button',[], function(){
         }
         if ( !type ) {
           xhr.setRequestHeader( "Content-Type", "application/x-www-form-urlencoded" );
-          xhr.send( parameterize( data ));
+          xhr.send( parameterize( data ) );
         } else {
           xhr.setRequestHeader( "Content-Type", type );
           xhr.send( data );
@@ -5851,12 +5281,15 @@ define('cornfield/module',['util/xhr'], function(XHR) {
     this.publish = function(id, callback) {
       XHR.post(server + "/api/publish/" + id, null, function() {
         if (this.readyState === 4) {
+          var response;
           try {
-            var response = JSON.parse(this.response);
-            callback(response);
+            response = JSON.parse(this.response);
           } catch (err) {
             callback({ error: "an unknown error occured" });
+            return;
           }
+
+          callback(response);
         }
       });
     };
@@ -5887,12 +5320,14 @@ define('cornfield/module',['util/xhr'], function(XHR) {
     this.list = function(callback) {
       XHR.get(server + "/api/projects", function() {
         if (this.readyState === 4) {
+          var response;
           try {
-            var response = JSON.parse(this.response);
-            callback(response);
+            response = JSON.parse(this.response);
           } catch (err) {
             callback({ error: "an unknown error occured" });
+            return;
           }
+          callback(response);
         }
       });
     };
@@ -5940,241 +5375,6 @@ define('cornfield/module',['util/xhr'], function(XHR) {
  * obtain one at http://www.mozillapopcorn.org/butter-license.txt */
 
 define('util/lang',[], function(){
-
-  /*************************************************************************/
-  // Support createContextualFragment when missing (IE9)
-  if ( 'Range' in window &&
-       !Range.prototype.createContextualFragment ) {
-
-    // Implementation used under MIT License, http://code.google.com/p/rangy/
-    // Copyright (c) 2010 Tim Down
-
-    // Implementation as per HTML parsing spec, trusting in the browser's
-    // implementation of innerHTML. See discussion and base code for this
-    // implementation at issue 67. Spec:
-    // http://html5.org/specs/dom-parsing.html#extensions-to-the-range-interface
-    // Thanks to Aleks Williams.
-
-    var dom = {
-      getDocument: function getDocument( node ) {
-        if ( node.nodeType === 9 ) {
-          return node;
-        } else if ( typeof node.ownerDocument !== "undefined" ) {
-          return node.ownerDocument;
-        } else if ( typeof node.document !== "undefined" ) {
-          return node.document;
-        } else if ( node.parentNode ) {
-          return this.getDocument( node.parentNode );
-        } else {
-          throw "No document found for node.";
-        }
-      },
-
-      isCharacterDataNode: function( node ) {
-        var t = node.nodeType;
-        // Text, CDataSection or Comment
-        return t === 3 || t === 4 || t === 8;
-      },
-
-      parentElement: function( node ) {
-        var parent = node.parentNode;
-        return parent.nodeType === 1 ? parent : null;
-      },
-
-      isHtmlNamespace: function( node ) {
-        // Opera 11 puts HTML elements in the null namespace,
-        // it seems, and IE 7 has undefined namespaceURI
-        var ns;
-        return typeof node.namespaceURI === "undefined" ||
-               ( ( ns = node.namespaceURI ) === null ||
-                 ns === "http://www.w3.org/1999/xhtml" );
-      },
-
-      fragmentFromNodeChildren: function( node ) {
-        var fragment = this.getDocument( node ).createDocumentFragment(), child;
-        while ( !!( child = node.firstChild ) ) {
-          fragment.appendChild(child);
-        }
-        return fragment;
-      }
-    };
-
-    Range.prototype.createContextualFragment = function( fragmentStr ) {
-      // "Let node the context object's start's node."
-      var node = this.startContainer,
-        doc = dom.getDocument(node);
-
-      // "If the context object's start's node is null, raise an INVALID_STATE_ERR
-      // exception and abort these steps."
-      if (!node) {
-        throw new DOMException( "INVALID_STATE_ERR" );
-      }
-
-      // "Let element be as follows, depending on node's interface:"
-      // Document, Document Fragment: null
-      var el = null;
-
-      // "Element: node"
-      if ( node.nodeType === 1 ) {
-        el = node;
-
-      // "Text, Comment: node's parentElement"
-      } else if ( dom.isCharacterDataNode( node ) ) {
-        el = dom.parentElement( node );
-      }
-
-      // "If either element is null or element's ownerDocument is an HTML document
-      // and element's local name is "html" and element's namespace is the HTML
-      // namespace"
-      if ( el === null ||
-           ( el.nodeName === "HTML" &&
-             dom.isHtmlNamespace( dom.getDocument( el ).documentElement ) &&
-             dom.isHtmlNamespace( el )
-           )
-         ) {
-        // "let element be a new Element with "body" as its local name and the HTML
-        // namespace as its namespace.""
-        el = doc.createElement( "body" );
-      } else {
-        el = el.cloneNode( false );
-      }
-
-      // "If the node's document is an HTML document: Invoke the HTML fragment parsing algorithm."
-      // "If the node's document is an XML document: Invoke the XML fragment parsing algorithm."
-      // "In either case, the algorithm must be invoked with fragment as the input
-      // and element as the context element."
-      el.innerHTML = fragmentStr;
-
-      // "If this raises an exception, then abort these steps. Otherwise, let new
-      // children be the nodes returned."
-
-      // "Let fragment be a new DocumentFragment."
-      // "Append all new children to fragment."
-      // "Return fragment."
-      return dom.fragmentFromNodeChildren( el );
-    };
-  }
-  /*************************************************************************/
-
-  /***************************************************************************
-   * Cross-browser full element.classList implementation for IE9 and friends.
-   * 2011-06-15
-   *
-   * By Eli Grey, http://purl.eligrey.com/github/classList.js/blob/master/classList.js
-   * Public Domain.
-   * NO WARRANTY EXPRESSED OR IMPLIED. USE AT YOUR OWN RISK.
-   */
-  /*global self, document, DOMException */
-  if (typeof document !== "undefined" && !("classList" in document.createElement("a"))) {
-    (function (view) {
-      
-
-      var classListProp = "classList",
-        protoProp = "prototype",
-        elemCtrProto = (view.HTMLElement || view.Element)[protoProp],
-        objCtr = Object,
-        strTrim = String[protoProp].trim || function () {
-          return this.replace(/^\s+|\s+$/g, "");
-        },
-        arrIndexOf = Array[protoProp].indexOf || function (item) {
-          var i = 0,
-            len = this.length;
-          for (; i < len; i++) {
-            if (i in this && this[i] === item) {
-              return i;
-            }
-          }
-          return -1;
-        },
-        // Vendors: please allow content code to instantiate DOMExceptions
-        DOMEx = function (type, message) {
-          this.name = type;
-          this.code = DOMException[type];
-          this.message = message;
-        },
-        checkTokenAndGetIndex = function (classList, token) {
-          if (token === "") {
-            throw new DOMEx("SYNTAX_ERR", "An invalid or illegal string was specified");
-          }
-          if (/\s/.test(token)) {
-            throw new DOMEx("INVALID_CHARACTER_ERR", "String contains an invalid character");
-          }
-          return arrIndexOf.call(classList, token);
-        },
-        ClassList = function (elem) {
-          var trimmedClasses = strTrim.call(elem.className),
-            classes = trimmedClasses ? trimmedClasses.split(/\s+/) : [],
-            i = 0,
-            len = classes.length;
-          for (; i < len; i++) {
-            this.push(classes[i]);
-          }
-          this._updateClassName = function () {
-            elem.className = this.toString();
-          };
-        },
-        classListProto = ClassList[protoProp] = [],
-        classListGetter = function () {
-          return new ClassList(this);
-        };
-
-      // Most DOMException implementations don't allow calling DOMException's toString()
-      // on non-DOMExceptions. Error's toString() is sufficient here.
-      DOMEx[protoProp] = Error[protoProp];
-      classListProto.item = function (i) {
-        return this[i] || null;
-      };
-      classListProto.contains = function (token) {
-        token += "";
-        return checkTokenAndGetIndex(this, token) !== -1;
-      };
-      classListProto.add = function (token) {
-        token += "";
-        if (checkTokenAndGetIndex(this, token) === -1) {
-          this.push(token);
-          this._updateClassName();
-        }
-      };
-      classListProto.remove = function (token) {
-        token += "";
-        var index = checkTokenAndGetIndex(this, token);
-        if (index !== -1) {
-          this.splice(index, 1);
-          this._updateClassName();
-        }
-      };
-      classListProto.toggle = function (token) {
-        token += "";
-        if (checkTokenAndGetIndex(this, token) === -1) {
-          this.add(token);
-        } else {
-          this.remove(token);
-        }
-      };
-      classListProto.toString = function () {
-        return this.join(" ");
-      };
-
-      if (objCtr.defineProperty) {
-        var classListPropDesc = {
-          get: classListGetter,
-          enumerable: true,
-          configurable: true
-        };
-        try {
-          objCtr.defineProperty(elemCtrProto, classListProp, classListPropDesc);
-        } catch (ex) { // IE 8 doesn't support enumerable:true
-          if (ex.number === -0x7FF5EC54) {
-            classListPropDesc.enumerable = false;
-            objCtr.defineProperty(elemCtrProto, classListProp, classListPropDesc);
-          }
-        }
-      } else if (objCtr[protoProp].__defineGetter__) {
-        elemCtrProto.__defineGetter__(classListProp, classListGetter);
-      }
-    }(self));
-  }
-  /***************************************************************************/
 
   return {
 
@@ -6283,6 +5483,15 @@ define('core/trackevent',[
 
   var __guid = 0;
 
+  var TrackEventUpdateException = function ( reason, message ) {
+    this.type = "trackevent-update";
+    this.reason = reason;
+    this.message = message;
+    this.toString = function () {
+      return "TrackEvent update failed: " + message;
+    };
+  };
+
   /**
    * Class: TrackEvent
    *
@@ -6322,7 +5531,10 @@ define('core/trackevent',[
 
     if( !_type ){
       _logger.log( "Warning: " + _id + " has no type." );
-    } //if
+    }
+    else {
+      this.manifest = Popcorn.manifest[ _type ];
+    }
 
     _popcornOptions.start = _popcornOptions.start || 0;
     _popcornOptions.start = TimeUtil.roundTime( _popcornOptions.start );
@@ -6346,79 +5558,87 @@ define('core/trackevent',[
      * Updates the event properties and runs sanity checks on input.
      *
      * @param {Object} updateOptions: Object containing plugin-specific properties to be updated for this TrackEvent.
-     * @event trackeventupdatefailed: Occurs when an update operation failed because of conflicting times or other serious property problems. As the data property on this event is a string which represents the reason for failure.
-     * @event trackeventupdated: Occurs whenan update operation succeeded.
+     * @event trackeventupdated: Occurs when an update operation succeeded.
+     * @throws TrackEventUpdateException: When an update operation failed because of conflicting times or other serious property problems.
      */
     this.update = function( updateOptions, applyDefaults ) {
       updateOptions = updateOptions || {};
 
-      var failed = false,
-          newStart = _popcornOptions.start,
-          newEnd = _popcornOptions.end;
+      var newStart = _popcornOptions.start,
+          newEnd = _popcornOptions.end,
+          manifestOptions;
 
-      if ( !isNaN( updateOptions.start ) ) {
-        newStart = TimeUtil.roundTime( updateOptions.start );
-      }
-      if ( !isNaN( updateOptions.end ) ) {
-        newEnd = TimeUtil.roundTime( updateOptions.end );
-      }
-
-      if ( newStart >= newEnd ){
-        failed = "invalidtime";
-      }
-      else {
-        if( _track && _track._media ){
-          var media = _track._media;
-          if( ( newStart > media.duration ) ||
-              ( newEnd > media.duration ) ||
-              ( newStart < 0 ) ) {
-            failed = "invalidtime";
-          }
+      if ( updateOptions.start ) {
+        if ( !isNaN( updateOptions.start ) ) {
+          newStart = TimeUtil.roundTime( updateOptions.start );
+        }
+        else {
+          throw new TrackEventUpdateException( "invalid-start-time", "[start] is an invalid value." );
         }
       }
 
-      if( failed ){
-        _this.dispatch( "trackeventupdatefailed", failed );
-      } else {
-        var _manifest = Popcorn.manifest[ _type ] && Popcorn.manifest[ _type ].options;
-        if( _manifest ){
-          for ( var prop in _manifest ) {
-            if ( _manifest.hasOwnProperty( prop ) ) {
+      if ( updateOptions.end ) {
+        if ( !isNaN( updateOptions.end ) ) {
+          newEnd = TimeUtil.roundTime( updateOptions.end );
+        }
+        else {
+          throw new TrackEventUpdateException( "invalid-end-time", "[end] is an invalid value." );
+        }
+
+      }
+
+      if ( newStart >= newEnd ) {
+        throw new TrackEventUpdateException( "start-greater-than-end", "[start] must be equal to or less than [end]." );
+      }
+      if ( _track && _track._media && _track._media.ready ) {
+        var media = _track._media;
+        if( ( newStart > media.duration ) ||
+            ( newEnd > media.duration ) ||
+            ( newStart < 0 ) ) {
+          throw new TrackEventUpdateException( "invalid-times", "[start] or [end] are not within the duration of media" );
+        }
+      }
+
+      if ( this.manifest ) {
+        manifestOptions = this.manifest.options;
+        if ( manifestOptions ) {
+          for ( var prop in manifestOptions ) {
+            if ( manifestOptions.hasOwnProperty( prop ) ) {
               if ( updateOptions[ prop ] === undefined ) {
                 if ( applyDefaults ) {
-                  _popcornOptions[ prop ] = defaultValue( _manifest[ prop ] );
+                  _popcornOptions[ prop ] = defaultValue( manifestOptions[ prop ] );
                 }
               } else {
                 _popcornOptions[ prop ] = updateOptions[ prop ];
               }
             }
           }
-
-          if ( !( "target" in _manifest ) && updateOptions.target ) {
+          if ( !( "target" in manifestOptions ) && updateOptions.target ) {
             _popcornOptions.target = updateOptions.target;
           }
         }
-
-        if( newStart ){
-          _popcornOptions.start = newStart;
-        }
-        if( newEnd ){
-          _popcornOptions.end = newEnd;
-        }
-
-        _view.update( _popcornOptions );
-        _this.popcornOptions = _popcornOptions;
-
-        // if PopcornWrapper exists, it means we're connected properly to a Popcorn instance,
-        // and can update the corresponding Popcorn trackevent for this object
-        if ( _popcornWrapper ) {
-          _popcornWrapper.updateEvent( _this );
-        }
-        
-        _this.dispatch( "trackeventupdated", _this );
+      }
+      
+      if( newStart ){
+        _popcornOptions.start = newStart;
+      }
+      if( newEnd ){
+        _popcornOptions.end = newEnd;
       }
 
-    }; //update
+      // if PopcornWrapper exists, it means we're connected properly to a Popcorn instance,
+      // and can update the corresponding Popcorn trackevent for this object
+      if ( _popcornWrapper ) {
+        _popcornWrapper.updateEvent( _this );
+      }
+
+      _view.update( _popcornOptions );
+      _this.popcornOptions = _popcornOptions;
+
+      // we should only get here if no exceptions happened
+      _this.dispatch( "trackeventupdated", _this );
+
+    };
 
     /**
      * Member: moveFrameLeft
@@ -6504,6 +5724,20 @@ define('core/trackevent',[
         configurable: false,
         get: function(){
           return _view;
+        }
+      },
+
+      /**
+       * Property: dragging
+       *
+       * A dragging state of the track event.
+       * @malleable: No.
+       */
+      dragging: {
+        enumerable: true,
+        configurable: false,
+        get: function(){
+          return _view.dragging;
         }
       },
 
@@ -6595,6 +5829,7 @@ define('core/trackevent',[
         },
         set: function( importData ){
           _type = _popcornOptions.type = importData.type;
+          this.manifest = Popcorn.manifest[ _type ];
           if( importData.name ){
             _name = importData.name;
           }
@@ -6779,8 +6014,7 @@ define('core/track',[
       _this.chain( trackEvent, [
         "trackeventupdated",
         "trackeventselected",
-        "trackeventdeselected",
-        "trackeventeditrequested"
+        "trackeventdeselected"
       ]);
       _view.addTrackEvent( trackEvent );
       trackEvent.track = _this;
@@ -6796,8 +6030,7 @@ define('core/track',[
         _this.unchain( trackEvent, [
           "trackeventupdated",
           "trackeventselected",
-          "trackeventdeselected",
-          "trackeventeditrequested"
+          "trackeventdeselected"
         ]);
         _view.removeTrackEvent( trackEvent );
         trackEvent._track = null;
@@ -6822,164 +6055,6 @@ define('core/track',[
 
 }); //define
 ;
-/* This Source Code Form is subject to the terms of the MIT license
- * If a copy of the MIT license was not distributed with this file, you can
- * obtain one at http://www.mozillapopcorn.org/butter-license.txt */
-
-(function() {
-
-  define('editor/module',[ "core/eventmanager",
-            "core/trackevent",
-            "./editor"
-          ], function(
-            EventManagerWrapper,
-            TrackEvent,
-            Editor
-          ){
-
-    function EventEditor( butter, moduleOptions ){
-
-      moduleOptions = moduleOptions || {};
-
-      var _editors = {},
-          _editorContainer,
-          _openEditor,
-          _this = this;
-
-      EventManagerWrapper( _this );
-
-      butter.listen( "trackeventcreated", function( e ){
-        if( [ "target", "media" ].indexOf( e.data.by ) > -1 && butter.ui.contentState === "timeline" ){
-          _this.edit( e.data.trackEvent );
-        }
-      });
-
-      function editorClosed( e ){
-        if( _openEditor.frame === "iframe" ){
-          if( butter.ui.contentState === "editor" ){
-            butter.ui.popContentState( "editor" );
-          }
-        }
-        _openEditor.unlisten( "close", editorClosed );
-        _openEditor = null;
-      }
-
-      function editorOpened( e ){
-        if( _openEditor.frame === "iframe" ){
-          if( butter.ui.contentState !== "editor" ){
-            butter.ui.pushContentState( "editor" );
-          }
-        }
-      }
-
-      this.edit = function( trackEvent ){
-        if ( !trackEvent || !( trackEvent instanceof TrackEvent ) ){
-          throw new Error( "trackEvent must be valid to start an editor." );
-        } //if
-
-        var type = trackEvent.type;
-        if ( !_editors[ type ] ){
-          type = "default";
-        } //if
-        if( !_openEditor ){
-          var editor = _editors[ type ];
-          if( editor ){
-            _openEditor = editor;
-            editor.listen( "open", editorOpened );
-            editor.open( trackEvent );
-            editor.listen( "close", editorClosed );
-          }
-          else{
-            throw new Error( "Editor " + type + " not found." );
-          }
-        }
-      }; //edit
-
-      this.add = function( source, type, frameType ){
-        if ( !type || !source ) {
-          throw new Error( "Can't create an editor without a plugin type and editor source" );
-        } //if
-        var editor = _editors[ type ] = new Editor( butter, source, type, frameType, _editorContainer );
-        return editor;
-      }; //add
-
-      this.remove = function( type ){
-        if ( !type ) {
-          return;
-        }
-        var oldSource = _editors[ type ];
-        _editors[ type ] = undefined;
-       return oldSource;
-      }; //remove
-
-      function trackEventDoubleClicked( e ){
-        _this.edit( e.target.trackEvent );
-      } //trackEventDoubleClicked
-
-      butter.listen( "trackeventadded", function( e ){
-        e.data.view.listen( "trackeventdoubleclicked", trackEventDoubleClicked, false );
-      });
-
-      butter.listen( "trackeventremoved", function( e ){
-        e.data.view.unlisten( "trackeventdoubleclicked", trackEventDoubleClicked, false );
-      });
-
-      this._start = function( onModuleReady ){
-        var parentElement = document.createElement( "div" );
-        parentElement.id = "butter-editor";
-
-        _editorContainer = document.createElement( "div" );
-        _editorContainer.id = "editor-container";
-        parentElement.appendChild( _editorContainer );
-
-        parentElement.classList.add( "fadable" );
-
-        butter.ui.areas.work.addComponent( parentElement, {
-          states: [ "editor" ],
-          transitionIn: function(){
-            parentElement.style.display = "block";
-            setTimeout(function(){
-              parentElement.style.opacity = "1";
-            }, 0);
-          },
-          transitionInComplete: function(){
-
-          },
-          transitionOut: function(){
-            if( _openEditor ){
-              _openEditor.close();
-            }
-            parentElement.style.opacity = "0";
-          },
-          transitionOutComplete: function(){
-            parentElement.style.display = "none";
-          }
-        });
-
-        parentElement.style.display = "none";
-
-        for( var editorName in moduleOptions ){
-          if( moduleOptions.hasOwnProperty( editorName ) ){
-            _this.add( moduleOptions[ editorName ], editorName );
-          }
-        }
-
-        onModuleReady();
-      }; //start
-
-      butter.listen( "trackeventeditrequested", function( e ){
-        _this.edit( e.target );
-      });
-
-    }
-
-    EventEditor.__moduleName = "editor";
-
-    return EventEditor;
-
-  }); //define
-}());
-
 /* This Source Code Form is subject to the terms of the MIT license
  * If a copy of the MIT license was not distributed with this file, you can
  * obtain one at http://www.mozillapopcorn.org/butter-license.txt */
@@ -7116,6 +6191,929 @@ define('timeline/timebar',[ "util/lang", "./scrubber" ], function( util, Scrubbe
  * If a copy of the MIT license was not distributed with this file, you can
  * obtain one at http://www.mozillapopcorn.org/butter-license.txt */
 
+define('plugin/plugin',[ "util/dragndrop", "util/lang" ], function( DragNDrop, LangUtils ){
+
+  var PLUGIN_ELEMENT_PREFIX = "popcorn-plugin-";
+
+  return function( id, pluginOptions ){
+    pluginOptions = pluginOptions || {};
+
+    var _id = "plugin" + id,
+        _this = this,
+        _name = pluginOptions.type,
+        _path = pluginOptions.path,
+        _manifest = {},
+        _type = pluginOptions.type,
+        _helper = document.getElementById( _this.type + "-icon" ) ||
+                  document.getElementById( "default-icon" );
+
+    // before we try and add the plugins script, make sure we have a path to it and we haven't already included it
+    if( _path && !Popcorn.manifest[ _type ] ) {
+      var head = document.getElementsByTagName( "HEAD" )[ 0 ],
+          script = document.createElement( "script" );
+
+      script.src = _path;
+      head.appendChild( script );
+    } //if
+
+    Object.defineProperties( this, {
+      id: {
+        enumerable: true,
+        get: function() {
+          return _id;
+        }
+      },
+      name: {
+        enumerable: true,
+        get: function() {
+          return _name;
+        }
+      },
+      path: {
+        enumerable: true,
+        get: function() {
+          return _path;
+        }
+      },
+      manifest: {
+        enumerable: true,
+        get: function() {
+          return _manifest;
+        },
+        set: function( manifest ) {
+          _manifest = manifest;
+        }
+      },
+      type: {
+        enumerable: true,
+        get: function() {
+          return _type;
+        }
+      },
+      helper: {
+        enumerable: true,
+        get: function(){
+          return _helper;
+        }
+      }
+    });
+
+    _helper = document.getElementById( _this.type + "-icon" ) || document.getElementById( "default-icon" );
+    if( _helper ) { _helper = _helper.cloneNode( false ); }
+
+    this.createElement = function ( butter, pattern ) {
+      var pluginElement;
+      if ( !pattern ) {
+        pluginElement = document.createElement( "span" );
+        pluginElement.innerHTML = _this.type + " ";
+      }
+      else {
+        var patternInstance = pattern.replace( /\$type/g, _this.type );
+        pluginElement = LangUtils.domFragment( patternInstance );
+      }
+      pluginElement.id = PLUGIN_ELEMENT_PREFIX + _this.type;
+      pluginElement.setAttribute( "data-popcorn-plugin-type", _this.type );
+      pluginElement.setAttribute( "data-butter-draggable-type", "plugin" );
+      DragNDrop.helper( pluginElement, {
+        image: _helper,
+        start: function(){
+          var targets = butter.targets,
+              media = butter.currentMedia;
+          media.view.blink();
+          for( var i=0, l=targets.length; i<l; ++i ){
+            targets[ i ].view.blink();
+          }
+        },
+        stop: function(){
+        }
+      });
+      this.element = pluginElement;
+      return pluginElement;
+    }; //createElement
+
+  };
+});
+
+/* This Source Code Form is subject to the terms of the MIT license
+ * If a copy of the MIT license was not distributed with this file, you can
+ * obtain one at http://www.mozillapopcorn.org/butter-license.txt */
+
+(function() {
+
+  define('plugin/module',[ "core/logger",
+            "util/dragndrop",
+            "util/scrollbars",
+            "./plugin-list",
+            "./plugin"
+          ],
+          function(
+            Logger,
+            DragNDrop,
+            Scrollbars,
+            PluginList,
+            Plugin
+          ) {
+
+    var __trackEventCSSRules = {},
+        __cssRuleProperty = "data-butter-trackevent-type",
+        __cssRulePrefix = "#butter-timeline .butter-track-event",
+        __newStyleSheet = document.createElement( "style" );
+
+    __newStyleSheet.type = "text/css";
+    __newStyleSheet.media = "screen";
+    __newStyleSheet.setAttribute( "data-butter-exclude", "true" );
+
+    function colourHashFromType( type ){
+      var hue = 0, saturation = 0, lightness = 0, srcString = type;
+
+      // very simple hashing function
+      while( srcString.length < 9 ){
+        srcString += type;
+      } //while
+      hue = ( srcString.charCodeAt( 0 ) + srcString.charCodeAt( 3 ) + srcString.charCodeAt( 6 ) ) % ( ( srcString.charCodeAt( 8) * 5 ) % 360 );
+      saturation = ( ( srcString.charCodeAt( 0 ) + srcString.charCodeAt( 2 ) + srcString.charCodeAt( 4 ) + srcString.charCodeAt( 6 ) ) % 100 ) * 0.05 + 95;
+      lightness = ( ( srcString.charCodeAt( 1 ) + srcString.charCodeAt( 3 ) + srcString.charCodeAt( 5 ) + srcString.charCodeAt( 7 ) ) % 100 ) * 0.20 + 40;
+
+      // bump up reds because they're hard to see
+      if( hue < 20 || hue > 340 ){
+        lightness += 10;
+      } //if
+
+      // dial back blue/greens a bit
+      if( hue > 160 && hue < 200 ){
+        lightness -= 10;
+      } //if
+
+      return {
+        h: hue,
+        s: saturation,
+        l: lightness
+      };
+    } //colourHashFromType
+
+    function createStyleForType( type ){
+      var styleContent = "",
+          hash = colourHashFromType( type );
+      styleContent +=__cssRulePrefix + "[" + __cssRuleProperty + "=\"" + type + "\"]{";
+      styleContent += "background: hsl( " + hash.h + ", " + hash.s + "%, " + hash.l + "% );";
+      styleContent += "}";
+      __newStyleSheet.innerHTML = __newStyleSheet.innerHTML + styleContent;
+    } //createStyleForType
+
+    var PluginManager = function( butter, moduleOptions ) {
+
+      var _plugins = [],
+          _container = document.createElement( "div" ),
+          _listWrapper = document.createElement( "div" ),
+          _listContainer = document.createElement( "div" ),
+          _this = this,
+          _pattern = '<div class="list-item $type_tool">$type</div>';
+
+      _container.id = "popcorn-plugin";
+      _listContainer.className = "list";
+      _listWrapper.className = "list-wrapper";
+
+      var title = document.createElement( "div" );
+      title.className = "title";
+      title.innerHTML = "<span>My Events</span>";
+      _container.appendChild( title );
+      _listWrapper.appendChild( _listContainer );
+      _container.appendChild( _listWrapper );
+
+      var _scrollbar = new Scrollbars.Vertical( _listWrapper, _listContainer );
+      _container.appendChild( _scrollbar.element );
+
+      this._start = function( onModuleReady ){
+        if( butter.ui ){
+          document.head.appendChild( __newStyleSheet );
+          butter.ui.areas.tools.addComponent( _container );
+          PluginList( butter );
+        }
+        if( moduleOptions && moduleOptions.plugins ){
+          _this.add( moduleOptions.plugins, onModuleReady );
+        }
+        else{
+          onModuleReady();
+        }
+      }; //start
+
+      this.add = function( plugin, cb ) {
+
+        if( plugin instanceof Array ) {
+          var counter = 0,
+              i = 0,
+              l = 0,
+              check = function() {
+                if ( ++counter === plugin.length && cb ) {
+                  cb();
+                }
+              };
+
+          for( i = 0, l = plugin.length; i < l; i++ ) {
+            _this.add( plugin[ i ], check );
+          }
+        } else {
+          if( !__trackEventCSSRules[ plugin.type ] ){
+            createStyleForType( plugin.type );
+          }
+
+          plugin = new Plugin( _plugins.length, plugin );
+
+          var interval = setInterval(function( e ) {
+            if( !Popcorn.manifest[ plugin.type ]) {
+              return;
+            }
+            plugin.manifest = Popcorn.manifest[ plugin.type ];
+            clearInterval( interval );
+            if( cb ){
+              cb();
+            }
+          }, 100);
+
+          _plugins.push( plugin );
+          if( moduleOptions.defaults && moduleOptions.defaults.indexOf( plugin.type ) > -1 ){
+            _listContainer.appendChild( plugin.createElement( butter, _pattern ) );
+          }
+          butter.dispatch( "pluginadded", plugin );
+        }
+
+        _scrollbar.update();
+
+        return plugin;
+      }; //add
+
+      this.remove = function( plugin ) {
+
+        if( typeof plugin === "string" ) {
+          plugin = this.get( plugin );
+          if( !plugin ) {
+            return;
+          }
+        }
+
+        var i, l;
+
+        for ( i = 0, l = _plugins.length; i < l; i++ ) {
+          if( _plugins[ i ].name === plugin.name ) {
+            var tracks = butter.tracks;
+            for ( i = 0, l = tracks.length; i < l; i++ ) {
+              var trackEvents = tracks[ i ].trackEvents;
+              for( var k = 0, ln = trackEvents.length - 1; ln >= k; ln-- ) {
+                if( trackEvents[ ln ].type === plugin.name ) {
+                  tracks[ i ].removeTrackEvent( trackEvents[ ln ] );
+                } //if
+              } //for
+            } //for
+
+            _plugins.splice( i, 1 );
+            l--;
+            _listContainer.removeChild( plugin.element );
+
+            var head = document.getElementsByTagName( "HEAD" )[ 0 ];
+            for ( i = 0, l = head.children.length; i < l; i++ ) {
+              if( head.children[ i ].getAttribute( "src" ) === plugin.path ) {
+                head.removeChild( head.children[ i ] );
+              }
+            }
+
+            butter.dispatch( "pluginremoved", plugin );
+          }
+        }
+
+        _scrollbar.update();
+      };
+
+      this.clear = function () {
+        while ( _plugins.length > 0 ) {
+          var plugin = _plugins.pop();
+          _listContainer.removeChild( plugin.element );
+          butter.dispatch( "pluginremoved", plugin );
+        }
+      }; //clear
+
+      this.get = function( name ) {
+        for ( var i=0, l=_plugins.length; i<l; ++i ) {
+          if ( _plugins[ i ].name === name ) {
+            return _plugins[ i ];
+          } //if
+        } //for
+      }; //get
+
+      DragNDrop.droppable( _container, {
+        drop: function( element ){
+          if( element.getAttribute( "data-butter-draggable-type" ) === "plugin" ){
+            var pluginType = element.getAttribute( "data-popcorn-plugin-type" ),
+                plugin = _this.get( pluginType );
+            if( plugin ){
+              for( var i=0; i<_listContainer.childNodes.length; ++i ){
+                if( _listContainer.childNodes[ i ].getAttribute( "data-popcorn-plugin-type" ) === pluginType ){
+                  return;
+                }
+              }
+              _listContainer.appendChild( plugin.createElement( butter, _pattern ) );
+            }
+          }
+        }
+      });
+    }; //PluginManager
+
+    PluginManager.__moduleName = "plugin";
+
+    return PluginManager;
+
+  }); //define
+}());
+
+/* This Source Code Form is subject to the terms of the MIT license
+ * If a copy of the MIT license was not distributed with this file, you can
+ * obtain one at http://www.mozillapopcorn.org/butter-license.txt */
+
+/**
+ * Module: Dialog
+ *
+ * Provides dialog functionality to Butter
+ */
+define('dialog/dialog',[ "util/lang", "core/eventmanager", "./modal" ],
+  function( LangUtils, EventManagerWrapper, Modal ){
+
+  var __dialogs = {},
+      __openDialogs = {},
+      __keyboardAvoidElements = [
+        "TEXTAREA"
+      ];
+
+  /**
+   * Function: __createDialog
+   *
+   * Creates a dialog based on src for html layout and ctor for scripted construction
+   *
+   * @param {String} layoutSrc: String from which the dialog's DOM fragment is created
+   * @param {Funtion} dialogCtor: Constructor to run after mandatory dialog constituents are created
+   */
+  function __createDialog( layoutSrc, dialogCtor ) {
+
+    /**
+     * Class: Dialog
+     *
+     * A Dialog
+     *
+     * @param {Object} spawnOptions: Can contain an 'event' object whose properties are events, and 'data' to pass to dialogCtor
+     */
+    return function ( spawnOptions ) {
+
+      spawnOptions = spawnOptions || {};
+
+      var _listeners = spawnOptions.events || {},
+          _activities = {},
+          _rootElement = LangUtils.domFragment( layoutSrc ),
+          _enterKeyActivity,
+          _escapeKeyActivity,
+          _modal;
+
+      // Make sure we have a handle to the butter-dialog div. If there are comments or extra elements
+      // described in layoutSrc, we don't care about them.
+      if ( !( _rootElement.classList && _rootElement.classList.contains( "butter-dialog" ) ) ) {
+        _rootElement = _rootElement.querySelector( ".butter-dialog" );
+      }
+
+      /**
+       * Member: onKeyDown
+       *
+       * Handler for keydown events that runs two specific activities if they're bound: Enter and Escape keys
+       *
+       * @param {Event} e: Standard DOM Event from a keydown occurrence
+       */
+      function onKeyDown( e ) {
+        if (  _enterKeyActivity &&
+              __keyboardAvoidElements.indexOf( e.target.nodeName ) === -1 &&
+              ( e.which === 13 || e.keyCode === 13 ) ) {
+          _activities[ _enterKeyActivity ]( e );
+        }
+        else if ( _escapeKeyActivity &&
+                  __keyboardAvoidElements.indexOf( e.target.nodeName ) === -1 &&
+                  ( e.which === 27 || e.keyCode === 27 ) ) {
+          _activities[ _escapeKeyActivity ]( e );
+        }
+      }
+
+      /**
+       * Member: _internal
+       *
+       * Namespace for the dialog, not exposed to the rest of Butter.
+       * This is mostly in place to persist the namespace division from the old method of
+       * implementing dialogs (with iframes), which used a special library to talk to Butter.
+       * _internal effectively replaces that library.
+       * There is a purposeful API separation here as a result.
+       */
+      var _internal = {
+        /**
+         * Member: rootElement
+         *
+         * Element constructed from layoutSrc to represent the basis for the Dialog.
+         */
+        rootElement: _rootElement,
+
+        /**
+         * Member: activity
+         *
+         * Calls the listener corresponding to the given activity name.
+         *
+         * @param {String} activityName: Name of the activity to execute
+         */
+        activity: function( activityName ){
+          _activities[ activityName ]();
+        },
+
+        /**
+         * Member: enableCloseButton
+         *
+         * Enables access to a close butter if it exists in the layout. Using this function,
+         * the layout can simply contain an element with a "close-button" class, and it will
+         * be connected to the "default-close" activity.
+         */
+        enableCloseButton: function(){
+          var closeButton = _rootElement.querySelector( ".close-button" );
+          if( closeButton ){
+            closeButton.addEventListener( "click", function closeClickHandler( e ){
+              _internal.activity( "default-close" );
+              closeButton.removeEventListener( "click", closeClickHandler, false );
+            }, false );
+          }
+        },
+
+        /**
+         * Member: showError
+         *
+         * Sets the error state of the dialog to true and insert a message into the element
+         * with an "error" class if one exists.
+         *
+         * @param {String} message: Error message to report
+         */
+        showError: function( message ){
+          var element = _rootElement.querySelector( ".error" );
+          if( element ){
+            element.innerHTML = message;
+            _rootElement.setAttribute( "data-error", true );
+          }
+        },
+
+        /**
+         * Member: hideError
+         *
+         * Removes the error state of the dialog.
+         */
+        hideError: function(){
+          _rootElement.removeAttribute( "data-error" );
+        },
+
+        /**
+         * Member: assignEnterKey
+         *
+         * Assigns the enter key to an activity.
+         *
+         * @param {String} activityName: Name of activity to assign to enter key
+         */
+        assignEnterKey: function( activityName ){
+          _enterKeyActivity = activityName;
+        },
+
+        /**
+         * Member: assignEscapeKey
+         *
+         * Assigns the escape key to an activity.
+         *
+         * @param {String} activityName: Name of activity to assign to escape key
+         */
+        assignEscapeKey: function( activityName ){
+          _escapeKeyActivity = activityName;
+        },
+
+        /**
+         * Member: registerActivity
+         *
+         * Registers an activity which can be referenced by the given name.
+         *
+         * @param {String} name: Name of activity
+         * @param {Function} callback: Function to call when activity occurs
+         */
+        registerActivity: function( name, callback ){
+          _activities[ name ] = callback;
+        },
+
+        /**
+         * Member: assignButton
+         *
+         * Assigns a button's click to an activity
+         *
+         * @param {String} selector: Selector for the button (DOM element)
+         * @param {String} activityName: Name of activity to link with the click of the given button
+         */
+        assignButton: function( selector, activityName ){
+          var element = _rootElement.querySelector( selector );
+          element.addEventListener( "click", _activities[ activityName ], false );
+        },
+
+        /**
+         * Member: enableElements
+         *
+         * Removes the "disabled" attribute from given elements
+         *
+         * @arguments: Each parameter pasesd into this function is treated as the selector for an element to enable
+         */
+        enableElements: function(){
+          var i = arguments.length;
+          while ( i-- ) {
+            _rootElement.querySelector( arguments[ i ] ).removeAttribute( "disabled" );
+          }
+        },
+
+        /**
+         * Member: disableElements
+         *
+         * Applies the "disabled" attribute to given elements
+         *
+         * @arguments: Each parameter pasesd into this function is treated as the selector for an element to enable
+         */
+        disableElements: function(){
+          var i = arguments.length;
+          while ( i-- ) {
+            _rootElement.querySelector( arguments[ i ] ).setAttribute( "disabled", true );
+          }
+        },
+
+        /**
+         * Member: send
+         *
+         * Sends a message to the _external namespace.
+         *
+         * @param {String} activityName: Name of activity to assign to escape key
+         * @param {*} data: Data to send along with the message
+         */
+        send: function( message, data ){
+          _external.dispatch( message, data );
+        }
+      };
+
+      /**
+       * Member: _external
+       *
+       * As with _internal, _external is supplied to Butter only to persist the design
+       * of dialogs as they were used in older versions. This maintains that Dialogs function
+       * as independent bodies which can send and receive messages from Butter.
+       * There is a purposeful API separation here as a result.
+       */
+      var _external = {
+        /**
+         * Member: send
+         *
+         * Sends a message to the _external namespace.
+         *
+         * @param {String} activityName: Name of activity to assign to escape key
+         * @param {*} data: Data to send along with the message
+         */
+        element: _rootElement,
+
+        /**
+         * Member: open
+         *
+         * Opens the dialog. If listeners were supplied during construction, they are attached now.
+         */
+        open: function() {
+          for ( var e in _listeners ) {
+            if ( _listeners.hasOwnProperty( e ) ) {
+              _external.listen( e, _listeners[ e ] );
+            }
+          }
+          _modal = new Modal( _rootElement );
+          setTimeout( function() {
+            _external.focus();
+          }, 0 );
+          document.addEventListener( "keydown", onKeyDown, false );
+          _internal.dispatch( "open" );
+          _external.dispatch( "open" );
+        },
+
+        /**
+         * Member: open
+         *
+         * Opens the dialog. If listeners were supplied during construction, they are removed now.
+         */
+        close: function() {
+          for( var e in _listeners ){
+            if ( _listeners.hasOwnProperty( e ) ) {
+              if ( e !== "close" ) {
+                _internal.unlisten( e, _listeners[ e ] );
+              }
+            }
+          }
+          _modal.destroy();
+          _modal = null;
+          document.removeEventListener( "keydown", onKeyDown, false );
+          _internal.dispatch( "close" );
+          _external.dispatch( "close" );
+        },
+
+        /**
+         * Member: send
+         *
+         * Sends a message to the dialog.
+         *
+         * @param {String} message: Message to send to the dialog.
+         * @param {*} data: Data to send along with the message.
+         */
+        send: function( message, data ) {
+          _internal.dispatch( message, data );
+        },
+
+        /**
+         * Member: focus
+         *
+         * Focuses the dialog as possible. Dispatches a "focus" event to the internal namespace to allow
+         * the dialog to respond accordingly, since there may be a better object to focus.
+         */
+        focus: function() {
+          _rootElement.focus();
+          _internal.dispatch( "focus" );
+        }
+
+      };
+
+      // Give both namespaces Event capabilities.
+      EventManagerWrapper( _internal );
+      EventManagerWrapper( _external );
+
+      // Register the "default-close" activity for immediate use.
+      _internal.registerActivity( "default-close", function(){
+        _external.close();
+      });
+
+      // Register the "default-ok" activity for immediate use.
+      _internal.registerActivity( "default-ok", function(){
+        _external.dispatch( "submit" );
+        _external.close();
+      });
+
+      // Call the dialog constructor now that everything is in place.
+      dialogCtor( _internal, spawnOptions.data );
+
+      // Return only the external namespace to Butter, since nothing else is required.
+      return _external;
+    };
+  }
+
+  /**
+   * ModuleNamespace: Dialog
+   */
+  return {
+
+    /**
+     * Member: register
+     *
+     * Registers a dialog to be created with a given layout and constructor.
+     *
+     * @param {String} name: Name of the dialog to be constructed when spawn is called
+     * @param {String} layoutSrc: String representing the basic DOM of the dialog
+     * @param {Function} dialogCtor: Function to be run after dialog internals are in place
+     */
+    register: function( name, layoutSrc, dialogCtor ) {
+      __dialogs[ name ] = __createDialog( layoutSrc, dialogCtor );
+    },
+
+    /**
+     * Member: spawn
+     *
+     * Creates a dialog represented by the given name.
+     *
+     * @param {String} name: Name of the dialog to construct
+     * @param {String} spawnOptions: Options to pass to the constructor (see __createDialog)
+     */
+    spawn: function( name, spawnOptions ) {
+      if ( __dialogs[ name ] ) {
+        // If the dialog is already open, just focus it.
+        if ( __openDialogs[ name ] ) {
+          __openDialogs[ name ].focus();
+        }
+        else {
+          __openDialogs[ name ] = __dialogs[ name ]( spawnOptions );
+          __openDialogs[ name ].listen( "close", function() {
+            __openDialogs[ name ] = null;
+          });
+        }
+        return __openDialogs[ name ];
+      }
+      else {
+        throw "Dialog '" + name + "' does not exist.";
+      }
+    },
+
+    modal: Modal
+  };
+});
+
+/* This Source Code Form is subject to the terms of the MIT license
+ * If a copy of the MIT license was not distributed with this file, you can
+ * obtain one at http://www.mozillapopcorn.org/butter-license.txt */
+
+define('timeline/trackhandles',[
+          "dialog/dialog",
+          "util/dragndrop"
+        ],
+        function( Dialog, DragNDrop ){
+
+  var ADD_TRACK_BUTTON_Y_ADJUSTMENT = 37;
+
+  return function( butter, media, tracksContainer, orderChangedCallback ){
+
+    var _media = media,
+        _container = document.createElement( "div" ),
+        _listElement = document.createElement( "div" ),
+        _addTrackButton = document.createElement( "button" ),
+        _tracks = {},
+        _menus = [],
+        _this = this;
+
+    _container.className = "track-handle-container";
+    _listElement.className = "handle-list";
+
+    _container.appendChild( _listElement );
+
+    _addTrackButton.id = "add-track";
+    _addTrackButton.innerHTML = "<span class=\"icon icon-plus-sign\"></span> Track";
+    _addTrackButton.classList.add( "butter-btn" );
+    _addTrackButton.title = "Add a new Track for your events";
+
+    _container.appendChild( _addTrackButton );
+
+    _addTrackButton.addEventListener( "click", function( e ){
+      butter.currentMedia.addTrack();
+    }, false );
+
+    var _sortable = DragNDrop.sortable( _listElement, {
+      change: function( elements ){
+        var orderedTracks = [];
+        for( var i=0, l=elements.length; i<l; ++i ){
+          var id = elements[ i ].getAttribute( "data-butter-track-id" );
+          orderedTracks.push( _tracks[ id ].track );
+        }
+        orderChangedCallback( orderedTracks );
+      }
+    });
+
+    function onTrackAdded( e ){
+      var track = e.data,
+          trackId = track.id,
+          trackName = track.name,
+          trackDiv = document.createElement( "div" ),
+          menuDiv = document.createElement( "div" ),
+          deleteButton = document.createElement( "div" );
+
+      menuDiv.className = "menu";
+      deleteButton.className = "delete";
+      menuDiv.appendChild( deleteButton );
+
+      deleteButton.addEventListener( "click", function( e ){
+        var dialog = Dialog.spawn( "delete-track", {
+          data: trackName,
+          events: {
+            submit: function( e ){
+              if( e.data === true ){
+                media.removeTrack( track );
+              } //if
+              dialog.close();
+            },
+            cancel: function( e ){
+              dialog.close();
+            }
+          }
+        });
+        dialog.open();
+      }, false );
+
+      trackDiv.addEventListener( "dblclick", function( e ){
+        var dialog = Dialog.spawn( "track-data", {
+          data: track,
+          events: {
+            submit: function( e ) {
+              // wrap in a try catch so we know right away about any malformed JSON
+              try {
+                var trackData = JSON.parse( e.data ),
+                    trackEvents = track.trackEvents,
+                    trackDataEvents = trackData.trackEvents,
+                    dontRemove = {},
+                    toAdd = [],
+                    i,
+                    l;
+
+                trackDiv.childNodes[ 0 ].textContent = track.name = trackData.name;
+                // update every trackevent with it's new data
+                for ( i = 0, l = trackDataEvents.length; i < l; i++ ) {
+                  var teData = trackDataEvents[ i ],
+                      te = track.getTrackEventById( teData.id );
+
+                  // check to see if the current track event exists already
+                  if ( te ) {
+                    te.update( teData.popcornOptions );
+                    /* remove it from our reference to the array of track events so we know
+                     * which ones to remove later
+                     */
+                    dontRemove[ teData.id ] = teData;
+                  // if we couldn't find the track event, it must be a new one
+                  } else {
+                    toAdd.push( { type: teData.type, popcornOptions: teData.popcornOptions } );
+                  }
+                }
+
+                // remove all trackEvents that wern't updated
+                for ( i = trackEvents.length, l = 0; i >= l; i-- ) {
+                  if ( trackEvents[ i ] && !dontRemove[ trackEvents[ i ].id ] ) {
+                    track.removeTrackEvent( trackEvents[ i ] );
+                  }
+                }
+
+                // add all the trackEvents that didn't exist so far
+                for ( i = 0, l = toAdd.length; i < l; i++ ) {
+                  track.addTrackEvent( toAdd[ i ] );
+                }
+                // let the dialog know things went well
+                dialog.send( "track-updated" );
+              } catch ( error ) {
+                // inform the dialog about the issue
+                dialog.send( "error" );
+              }
+            }
+          }
+        });
+        dialog.open();
+      }, false );
+
+      _menus.push( menuDiv );
+
+      trackDiv.className = "track-handle";
+      trackDiv.id = "track-handle-" + trackId;
+      trackDiv.setAttribute( "data-butter-track-id", trackId );
+      trackDiv.appendChild( document.createTextNode( trackName ) );
+      trackDiv.appendChild( menuDiv );
+
+      _sortable.addItem( trackDiv );
+
+      _listElement.appendChild( trackDiv );
+
+      _tracks[ trackId ] = {
+        id: trackId,
+        track: track,
+        element: trackDiv,
+        menu: menuDiv
+      };
+
+      _addTrackButton.style.top = _listElement.offsetHeight - ADD_TRACK_BUTTON_Y_ADJUSTMENT + "px";
+    }
+
+    var existingTracks = _media.tracks;
+    for( var i=0; i<existingTracks.length; ++i ){
+      onTrackAdded({
+        data: existingTracks[ i ]
+      });
+    }
+
+    _media.listen( "trackadded", onTrackAdded );
+
+    _media.listen( "trackremoved", function( e ){
+      var trackId = e.data.id;
+      _listElement.removeChild( _tracks[ trackId ].element );
+      _sortable.removeItem( _tracks[ trackId ].element );
+      _menus.splice( _menus.indexOf( _tracks[ trackId ].menu ), 1 );
+      delete _tracks[ trackId ];
+      _addTrackButton.style.top = _listElement.offsetHeight - ADD_TRACK_BUTTON_Y_ADJUSTMENT + "px";
+    });
+
+    tracksContainer.element.addEventListener( "scroll", function( e ){
+      _container.scrollTop = tracksContainer.element.scrollTop;
+    }, false );
+
+    this.update = function(){
+      _container.scrollTop = tracksContainer.element.scrollTop;
+      _addTrackButton.style.top = _listElement.offsetHeight - ADD_TRACK_BUTTON_Y_ADJUSTMENT + "px";
+    }; //update
+
+    _this.update();
+
+    Object.defineProperties( this, {
+      element: {
+        enumerable: true,
+        get: function(){
+          return _container;
+        }
+      }
+    });
+
+  }; //TrackHandles
+
+});
+
+/* This Source Code Form is subject to the terms of the MIT license
+ * If a copy of the MIT license was not distributed with this file, you can
+ * obtain one at http://www.mozillapopcorn.org/butter-license.txt */
+
 define('timeline/media',[
           "core/trackevent",
           "core/track",
@@ -7126,8 +7124,6 @@ define('timeline/media',[
           "./zoombar",
           "./status",
           "./trackhandles",
-          // Include util/lang so we have access to our classList shim for browsers that don't support it
-          "util/lang"
         ],
         function(
           TrackEvent,
@@ -7138,8 +7134,8 @@ define('timeline/media',[
           TimeBar,
           ZoomBar,
           Status,
-          TrackHandles,
-          LangUtil ) {
+          TrackHandles
+        ) {
 
   var MIN_ZOOM = 300,
       DEFAULT_ZOOM = 0.5;
@@ -7164,7 +7160,6 @@ define('timeline/media',[
         _rootElement = document.createElement( "div" ),
         _container = document.createElement( "div" ),
         _mediaStatusContainer = document.createElement( "div" ),
-        _selectedTrackEvents = [],
         _hScrollBar = new Scrollbars.Horizontal( _tracksContainer ),
         _vScrollBar = new Scrollbars.Vertical( _tracksContainer, _rootElement ),
         _shrunken = false,
@@ -7194,14 +7189,6 @@ define('timeline/media',[
 
     _media.listen( "mediaplaying", snapToCurrentTime );
     _media.listen( "mediapause", snapToCurrentTime );
-
-    _media.listen( "trackeventselected", function( e ){
-      _selectedTrackEvents.push( e.target );
-    });
-
-    _media.listen( "trackeventdeselected", function( e ){
-      _selectedTrackEvents.splice( _selectedTrackEvents.indexOf( e.target ), 1 );
-    });
 
     function blinkTarget( target ){
       if( target !== _media.target ){
@@ -7614,414 +7601,6 @@ define('timeline/module',[
   return Timeline;
 }); //define
 ;
-/* This Source Code Form is subject to the terms of the MIT license
- * If a copy of the MIT license was not distributed with this file, you can
- * obtain one at http://www.mozillapopcorn.org/butter-license.txt */
-
-define('plugin/plugin',[ "util/dragndrop", "util/lang" ], function( DragNDrop, LangUtils ){
-
-  var PLUGIN_ELEMENT_PREFIX = "butter-plugin-";
-
-  return function( id, pluginOptions ){
-    pluginOptions = pluginOptions || {};
-
-    var _id = "plugin" + id,
-        _this = this,
-        _name = pluginOptions.type,
-        _path = pluginOptions.path,
-        _manifest = {},
-        _type = pluginOptions.type,
-        _helper = document.getElementById( _this.type + "-icon" ) ||
-                  document.getElementById( "default-icon" );
-
-    // before we try and add the plugins script, make sure we have a path to it and we haven't already included it
-    if( _path && !Popcorn.manifest[ _type ] ) {
-      var head = document.getElementsByTagName( "HEAD" )[ 0 ],
-          script = document.createElement( "script" );
-
-      script.src = _path;
-      head.appendChild( script );
-    } //if
-
-    Object.defineProperties( this, {
-      id: {
-        enumerable: true,
-        get: function() {
-          return _id;
-        }
-      },
-      name: {
-        enumerable: true,
-        get: function() {
-          return _name;
-        }
-      },
-      path: {
-        enumerable: true,
-        get: function() {
-          return _path;
-        }
-      },
-      manifest: {
-        enumerable: true,
-        get: function() {
-          return _manifest;
-        },
-        set: function( manifest ) {
-          _manifest = manifest;
-        }
-      },
-      type: {
-        enumerable: true,
-        get: function() {
-          return _type;
-        }
-      },
-      helper: {
-        enumerable: true,
-        get: function(){
-          return _helper;
-        }
-      }
-    });
-
-    _helper = document.getElementById( _this.type + "-icon" ) || document.getElementById( "default-icon" );
-    if( _helper ) { _helper = _helper.cloneNode( false ); }
-
-    this.createElement = function ( butter, pattern ) {
-      var pluginElement;
-      if ( !pattern ) {
-        pluginElement = document.createElement( "span" );
-        pluginElement.innerHTML = _this.type + " ";
-      }
-      else {
-        var patternInstance = pattern.replace( /\$type/g, _this.type );
-        pluginElement = LangUtils.domFragment( patternInstance );
-      }
-      pluginElement.id = PLUGIN_ELEMENT_PREFIX + _this.type;
-      pluginElement.setAttribute( "data-butter-plugin-type", _this.type );
-      pluginElement.setAttribute( "data-butter-draggable-type", "plugin" );
-      DragNDrop.helper( pluginElement, {
-        image: _helper,
-        start: function(){
-          var targets = butter.targets,
-              media = butter.currentMedia;
-          media.view.blink();
-          for( var i=0, l=targets.length; i<l; ++i ){
-            targets[ i ].view.blink();
-          }
-        },
-        stop: function(){
-        }
-      });
-      this.element = pluginElement;
-      return pluginElement;
-    }; //createElement
-
-  };
-});
-
-/* This Source Code Form is subject to the terms of the MIT license
- * If a copy of the MIT license was not distributed with this file, you can
- * obtain one at http://www.mozillapopcorn.org/butter-license.txt */
-
-(function() {
-
-  define('plugin/module',[ "core/logger",
-            "util/dragndrop",
-            "util/scrollbars",
-            "./plugin-list",
-            "./plugin"
-          ],
-          function(
-            Logger,
-            DragNDrop,
-            Scrollbars,
-            PluginList,
-            Plugin
-          ) {
-
-    var __trackEventCSSRules = {},
-        __cssRuleProperty = "data-butter-trackevent-type",
-        __cssRulePrefix = "#butter-timeline .butter-track-event",
-        __newStyleSheet = document.createElement( "style" );
-
-    __newStyleSheet.type = "text/css";
-    __newStyleSheet.media = "screen";
-    __newStyleSheet.setAttribute( "data-butter-exclude", "true" );
-
-    function colourHashFromType( type ){
-      var hue = 0, saturation = 0, lightness = 0, srcString = type;
-
-      // very simple hashing function
-      while( srcString.length < 9 ){
-        srcString += type;
-      } //while
-      hue = ( srcString.charCodeAt( 0 ) + srcString.charCodeAt( 3 ) + srcString.charCodeAt( 6 ) ) % ( ( srcString.charCodeAt( 8) * 5 ) % 360 );
-      saturation = ( ( srcString.charCodeAt( 0 ) + srcString.charCodeAt( 2 ) + srcString.charCodeAt( 4 ) + srcString.charCodeAt( 6 ) ) % 100 ) * 0.05 + 95;
-      lightness = ( ( srcString.charCodeAt( 1 ) + srcString.charCodeAt( 3 ) + srcString.charCodeAt( 5 ) + srcString.charCodeAt( 7 ) ) % 100 ) * 0.20 + 40;
-
-      // bump up reds because they're hard to see
-      if( hue < 20 || hue > 340 ){
-        lightness += 10;
-      } //if
-
-      // dial back blue/greens a bit
-      if( hue > 160 && hue < 200 ){
-        lightness -= 10;
-      } //if
-
-      return {
-        h: hue,
-        s: saturation,
-        l: lightness
-      };
-    } //colourHashFromType
-
-    function createStyleForType( type ){
-      var styleContent = "",
-          hash = colourHashFromType( type );
-      styleContent +=__cssRulePrefix + "[" + __cssRuleProperty + "=\"" + type + "\"]{";
-      styleContent += "background: hsl( " + hash.h + ", " + hash.s + "%, " + hash.l + "% );";
-      styleContent += "}";
-      __newStyleSheet.innerHTML = __newStyleSheet.innerHTML + styleContent;
-    } //createStyleForType
-
-    var PluginManager = function( butter, moduleOptions ) {
-
-      var _plugins = [],
-          _container = document.createElement( "div" ),
-          _listWrapper = document.createElement( "div" ),
-          _listContainer = document.createElement( "div" ),
-          _this = this,
-          _pattern = '<div class="list-item $type_tool">$type</div>';
-
-      _container.id = "butter-plugin";
-      _listContainer.className = "list";
-      _listWrapper.className = "list-wrapper";
-
-      var title = document.createElement( "div" );
-      title.className = "title";
-      title.innerHTML = "<span>My Events</span>";
-      _container.appendChild( title );
-      _listWrapper.appendChild( _listContainer );
-      _container.appendChild( _listWrapper );
-
-      var _scrollbar = new Scrollbars.Vertical( _listWrapper, _listContainer );
-      _container.appendChild( _scrollbar.element );
-
-      this._start = function( onModuleReady ){
-        if( butter.ui ){
-          document.head.appendChild( __newStyleSheet );
-          butter.ui.areas.tools.addComponent( _container );
-          PluginList( butter );
-        }
-        if( moduleOptions && moduleOptions.plugins ){
-          _this.add( moduleOptions.plugins, onModuleReady );
-        }
-        else{
-          onModuleReady();
-        }
-      }; //start
-
-      this.add = function( plugin, cb ) {
-
-        if( plugin instanceof Array ) {
-          var counter = 0,
-              i = 0,
-              l = 0,
-              check = function() {
-                if ( ++counter === plugin.length && cb ) {
-                  cb();
-                }
-              };
-
-          for( i = 0, l = plugin.length; i < l; i++ ) {
-            _this.add( plugin[ i ], check );
-          }
-        } else {
-          if( !__trackEventCSSRules[ plugin.type ] ){
-            createStyleForType( plugin.type );
-          }
-
-          plugin = new Plugin( _plugins.length, plugin );
-
-          var interval = setInterval(function( e ) {
-            if( !Popcorn.manifest[ plugin.type ]) {
-              return;
-            }
-            plugin.manifest = Popcorn.manifest[ plugin.type ];
-            clearInterval( interval );
-            if( cb ){
-              cb();
-            }
-          }, 100);
-
-          _plugins.push( plugin );
-          if( moduleOptions.defaults && moduleOptions.defaults.indexOf( plugin.type ) > -1 ){
-            _listContainer.appendChild( plugin.createElement( butter, _pattern ) );
-          }
-          butter.dispatch( "pluginadded", plugin );
-        }
-
-        _scrollbar.update();
-
-        return plugin;
-      }; //add
-
-      this.remove = function( plugin ) {
-
-        if( typeof plugin === "string" ) {
-          plugin = this.get( plugin );
-          if( !plugin ) {
-            return;
-          }
-        }
-
-        var i, l;
-
-        for ( i = 0, l = _plugins.length; i < l; i++ ) {
-          if( _plugins[ i ].name === plugin.name ) {
-            var tracks = butter.tracks;
-            for ( i = 0, l = tracks.length; i < l; i++ ) {
-              var trackEvents = tracks[ i ].trackEvents;
-              for( var k = 0, ln = trackEvents.length - 1; ln >= k; ln-- ) {
-                if( trackEvents[ ln ].type === plugin.name ) {
-                  tracks[ i ].removeTrackEvent( trackEvents[ ln ] );
-                } //if
-              } //for
-            } //for
-
-            _plugins.splice( i, 1 );
-            l--;
-            _listContainer.removeChild( plugin.element );
-
-            var head = document.getElementsByTagName( "HEAD" )[ 0 ];
-            for ( i = 0, l = head.children.length; i < l; i++ ) {
-              if( head.children[ i ].getAttribute( "src" ) === plugin.path ) {
-                head.removeChild( head.children[ i ] );
-              }
-            }
-
-            butter.dispatch( "pluginremoved", plugin );
-          }
-        }
-
-        _scrollbar.update();
-      };
-
-      this.clear = function () {
-        while ( _plugins.length > 0 ) {
-          var plugin = _plugins.pop();
-          _listContainer.removeChild( plugin.element );
-          butter.dispatch( "pluginremoved", plugin );
-        }
-      }; //clear
-
-      this.get = function( name ) {
-        for ( var i=0, l=_plugins.length; i<l; ++i ) {
-          if ( _plugins[ i ].name === name ) {
-            return _plugins[ i ];
-          } //if
-        } //for
-      }; //get
-
-      DragNDrop.droppable( _container, {
-        drop: function( element ){
-          if( element.getAttribute( "data-butter-draggable-type" ) === "plugin" ){
-            var pluginType = element.getAttribute( "data-butter-plugin-type" ),
-                plugin = _this.get( pluginType );
-            if( plugin ){
-              for( var i=0; i<_listContainer.childNodes.length; ++i ){
-                if( _listContainer.childNodes[ i ].getAttribute( "data-butter-plugin-type" ) === pluginType ){
-                  return;
-                }
-              }
-              _listContainer.appendChild( plugin.createElement( butter, _pattern ) );
-            }
-          }
-        }
-      });
-    }; //PluginManager
-
-    PluginManager.__moduleName = "plugin";
-
-    return PluginManager;
-
-  }); //define
-}());
-
-/* This Source Code Form is subject to the terms of the MIT license
- * If a copy of the MIT license was not distributed with this file, you can
- * obtain one at http://www.mozillapopcorn.org/butter-license.txt */
-
-define('modules',[
-    "editor/module",
-    "timeline/module",
-    "cornfield/module",
-    "plugin/module"
-  ],
-  function(){
-
-  var moduleList = Array.prototype.slice.apply( arguments );
-
-  return function( butter, config, onReady ){
-
-    var modules = [],
-        loadedModules = 0,
-        readyModules = 0;
-
-    for( var i=0; i<moduleList.length; ++i ){
-      var name = moduleList[ i ].__moduleName;
-      butter[ name ] = new moduleList[ i ]( butter, config.value( name ) );
-      modules.push( butter[ name ] );
-    } //for
-
-    return {
-      load: function( onLoaded ){
-        function onModuleLoaded(){
-          loadedModules++;
-          if( loadedModules === modules.length ){
-            onLoaded();
-          }
-        }
-
-        for( var i=0; i<modules.length; ++i ){
-          if( modules[ i ]._load ){
-            modules[ i ]._load( onModuleLoaded );
-          }
-          else{
-            loadedModules++;
-          } //if
-        } //for
-
-        if( loadedModules === modules.length ){
-          onLoaded();
-        }
-      },
-      ready: function( onReady ){
-        function onModuleReady(){
-          readyModules++;
-          if( readyModules === modules.length ){
-            onReady();
-          }
-        }
-
-        for( var i=0; i<modules.length; ++i ){
-          if( modules[ i ]._start ){
-            modules[ i ]._start( onModuleReady );
-          }
-          else{
-            readyModules++;
-          } //if
-        } //for
-      }
-    };
-
-  };
-
-});
-
 /*
  RequireJS text 1.0.8 Copyright (c) 2010-2011, The Dojo Foundation All Rights Reserved.
  Available via the MIT or new BSD license.
@@ -8034,7 +7613,7 @@ o,p,q)?e.get(h,function(c){e.finishLoad(a,d.strip,c,b,f)}):c([g],function(a){e.f
 b,d)},d)}};if(e.createXhr())e.get=function(a,c){var b=e.createXhr();b.open("GET",a,!0);b.onreadystatechange=function(){b.readyState===4&&c(b.responseText)};b.send(null)};else if(typeof process!=="undefined"&&process.versions&&process.versions.node)l=require.nodeRequire("fs"),e.get=function(a,c){var b=l.readFileSync(a,"utf8");b.indexOf("\ufeff")===0&&(b=b.substring(1));c(b)};else if(typeof Packages!=="undefined")e.get=function(a,c){var b=new java.io.File(a),f=java.lang.System.getProperty("line.separator"),
 b=new java.io.BufferedReader(new java.io.InputStreamReader(new java.io.FileInputStream(b),"utf-8")),d,e,h="";try{d=new java.lang.StringBuffer;(e=b.readLine())&&e.length()&&e.charAt(0)===65279&&(e=e.substring(1));for(d.append(e);(e=b.readLine())!==null;)d.append(f),d.append(e);h=String(d.toString())}finally{b.close()}c(h)};return e})})();
 
-define('text!default-config.json',[],function () { return '{\n  "name": "default-config",\n  "baseDir": "../",\n  "snapshotHTMLOnReady": true,\n  "scrapePage": true,\n  "title": "Popcorn Maker",\n  "editor": {\n    "default": "{{baseDir}}editors/default-editor.html",\n    "googlemap": "{{baseDir}}editors/googlemap-editor.html"\n  },\n  "ui": {\n    "enabled": true,\n    "trackEventHighlight": "click"\n  },\n  "mediaDefaults": {\n    "frameAnimation": true\n  },\n  "plugin": {\n    "plugins": [\n      {\n        "type": "attribution",\n        "path": "{{baseDir}}external/popcorn-js/plugins/attribution/popcorn.attribution.js"\n      },\n      {\n        "type": "webpage",\n        "path": "{{baseDir}}external/popcorn-js/plugins/webpage/popcorn.webpage.js"\n      },\n      {\n        "type": "text",\n        "path": "{{baseDir}}external/popcorn-js/plugins/text/popcorn.text.js"\n      },\n      {\n        "type": "googlemap",\n        "path": "{{baseDir}}external/popcorn-js/plugins/googlemap/popcorn.googlemap.js"\n      },\n      {\n        "type": "image",\n        "path": "{{baseDir}}external/popcorn-js/plugins/image/popcorn.image.js"\n      },\n      {\n        "type": "twitter",\n        "path": "{{baseDir}}external/popcorn-js/plugins/twitter/popcorn.twitter.js"\n      },\n      {\n        "type": "wikipedia",\n        "path": "{{baseDir}}external/popcorn-js/plugins/wikipedia/popcorn.wikipedia.js"\n      }\n    ],\n    "defaults": [\n      "text",\n      "image",\n      "googlemap"\n    ]\n  },\n  "player": {\n    "players": [\n      {\n        "type": "youtube",\n        "path": "{{baseDir}}external/popcorn-js/players/youtube/popcorn.youtube.js"\n      },\n      {\n        "type": "soundcloud",\n        "path": "{{baseDir}}external/popcorn-js/players/soundcloud/popcorn.soundcloud.js"\n      },\n      {\n        "type": "vimeo",\n        "path": "{{baseDir}}external/popcorn-js/players/vimeo/popcorn.vimeo.js"\n      }\n    ],\n    "defaults": [\n      "youtube",\n      "soundcloud",\n      "vimeo"\n    ]\n  },\n  "dirs": {\n    "popcorn-js": "{{baseDir}}external/popcorn-js/",\n    "css": "{{baseDir}}css/",\n    "dialogs": "{{baseDir}}dialogs/",\n    "resources": "{{baseDir}}resources/"\n  },\n  "icons": {\n    "default": "popcorn-icon.png",\n    "image": "image-icon.png"\n  }\n}\n';});
+define('text!default-config.json',[],function () { return '{\n  "name": "default-config",\n  "baseDir": "../",\n  "snapshotHTMLOnReady": true,\n  "scrapePage": true,\n  "title": "Popcorn Maker",\n  "ui": {\n    "enabled": true,\n    "trackEventHighlight": "click"\n  },\n  "mediaDefaults": {\n    "frameAnimation": true\n  },\n  "plugin": {\n    "plugins": [\n      {\n        "type": "attribution",\n        "path": "{{baseDir}}external/popcorn-js/plugins/attribution/popcorn.attribution.js"\n      },\n      {\n        "type": "webpage",\n        "path": "{{baseDir}}external/popcorn-js/plugins/webpage/popcorn.webpage.js"\n      },\n      {\n        "type": "text",\n        "path": "{{baseDir}}external/popcorn-js/plugins/text/popcorn.text.js"\n      },\n      {\n        "type": "googlemap",\n        "path": "{{baseDir}}external/popcorn-js/plugins/googlemap/popcorn.googlemap.js"\n      },\n      {\n        "type": "image",\n        "path": "{{baseDir}}external/popcorn-js/plugins/image/popcorn.image.js"\n      },\n      {\n        "type": "twitter",\n        "path": "{{baseDir}}external/popcorn-js/plugins/twitter/popcorn.twitter.js"\n      },\n      {\n        "type": "wikipedia",\n        "path": "{{baseDir}}external/popcorn-js/plugins/wikipedia/popcorn.wikipedia.js"\n      }\n    ],\n    "defaults": [\n      "text",\n      "image",\n      "googlemap"\n    ]\n  },\n  "player": {\n    "players": [\n      {\n        "type": "youtube",\n        "path": "{{baseDir}}external/popcorn-js/players/youtube/popcorn.youtube.js"\n      },\n      {\n        "type": "soundcloud",\n        "path": "{{baseDir}}external/popcorn-js/players/soundcloud/popcorn.soundcloud.js"\n      },\n      {\n        "type": "vimeo",\n        "path": "{{baseDir}}external/popcorn-js/players/vimeo/popcorn.vimeo.js"\n      }\n    ],\n    "defaults": [\n      "youtube",\n      "soundcloud",\n      "vimeo"\n    ]\n  },\n  "dirs": {\n    "popcorn-js": "{{baseDir}}external/popcorn-js/",\n    "css": "{{baseDir}}css/",\n    "resources": "{{baseDir}}resources/"\n  },\n  "icons": {\n    "default": "popcorn-icon.png",\n    "image": "image-icon.png"\n  }\n}\n';});
 
 define('text!layouts/ua-warning.html',[],function () { return '<div class="butter-ua-warning" data-butter-exclude>Your web browser may lack some functionality expected by Butter to function properly. Please upgrade your browser or <a href="https://webmademovies.lighthouseapp.com/projects/65733-popcorn-maker">file a bug</a> to find out why your browser isn\'t fully supported. Click <a href="#" class="close-button">here</a> to remove this warning.</div>';});
 
@@ -8175,9 +7754,8 @@ define('core/views/media-view',[ "ui/page-element", "ui/logo-spinner", "util/lan
     }
 
     function changeUrl() {
-      var validTextboxes = [],
-          textboxes = _container.querySelectorAll( "input[type='text']" ),
-          errorTextboxes = [];
+      var urlArray = [],
+          textboxes = _container.querySelectorAll( "input[type='text']" );
 
       _subtitle.classList.add( "form-ok" );
       _subtitle.classList.remove( "form-error" );
@@ -8185,31 +7763,11 @@ define('core/views/media-view',[ "ui/page-element", "ui/logo-spinner", "util/lan
       for ( var i = 0, len = textboxes.length; i < len; i++ ) {
         textboxes[ i ].classList.add( "form-ok" );
         textboxes[ i ].classList.remove( "form-error" );
-        if ( testUrl( textboxes[ i ].value ) ) {
-          validTextboxes.push( textboxes[ i ].value );
-        }
-        else {
-          _subtitle.classList.remove( "form-ok" );
-          _subtitle.classList.add( "form-error" );
-          errorTextboxes.push( textboxes[ i ] );
-          textboxes[ i ].classList.remove( "form-ok" );
-          textboxes[ i ].classList.add( "form-error" );
-        }
+        urlArray.push( textboxes[ i ].value );
       }
 
-      if ( errorTextboxes.length ) {
-        showError( true, "URL(s) not valid. Please use http://..." );
-      }
-      else if ( validTextboxes.length ) {
-        _subtitle.innerHTML = "URL changed.";
-        media.url = validTextboxes;
-      }
+      media.url = urlArray;
 
-    }
-
-    function testUrl( url ) {
-      var test = /(http|https):\/\/(\w+:{0,1}\w*@)?(\S+)(:[0-9]+)?(\/|\/([\w#!:.?+=&%@!\-\/]))?/;
-      return url.match(test);
     }
 
     _urlTextbox.addEventListener( "keypress", function( e ){
@@ -8250,16 +7808,29 @@ define('core/views/media-view',[ "ui/page-element", "ui/logo-spinner", "util/lan
       }
     }
 
+    function disableURLS( flag ) {
+      var removeButtons = _urlList.querySelectorAll( "button.butter-btn-remove" ),
+          urls = _urlList.querySelectorAll( "input[type='text']" );
+      for ( var i = 0; i < urls.length; i++ ) {
+        urls[ i ].disabled = flag;
+        removeButtons[ i ].disabled = flag;
+      }
+      _keepOpen = flag;
+      _addUrlButton.disabled = flag;
+    }
+
     media.listen( "mediacontentchanged", function( e ){
       updateURLS();
       showError( false );
       _changeButton.setAttribute( "disabled", true );
+      disableURLS( true );
       _logoSpinner.start();
     });
 
     media.listen( "mediafailed", function( e ){
       showError( true, "Media failed to load. Check your URL." );
       _changeButton.removeAttribute( "disabled" );
+      disableURLS( false );
       _urlTextbox.className += " form-error";
       _subtitle.className += " form-error";
       _logoSpinner.stop();
@@ -8268,6 +7839,7 @@ define('core/views/media-view',[ "ui/page-element", "ui/logo-spinner", "util/lan
     media.listen( "mediaready", function( e ){
       showError( false );
       _changeButton.removeAttribute( "disabled" );
+      disableURLS( false );
       _logoSpinner.stop();
     });
 
@@ -8349,7 +7921,7 @@ define('core/views/media-view',[ "ui/page-element", "ui/logo-spinner", "util/lan
           _target = mediaOptions.target,
           _registry,
           _currentTime = 0,
-          _duration = 0,
+          _duration = -1,
           _popcornOptions = mediaOptions.popcornOptions,
           _mediaUpdateInterval,
           _view,
@@ -8481,8 +8053,7 @@ define('core/views/media-view',[ "ui/page-element", "ui/logo-spinner", "util/lan
           "trackeventremoved",
           "trackeventupdated",
           "trackeventselected",
-          "trackeventdeselected",
-          "trackeventeditrequested"
+          "trackeventdeselected"
         ]);
         track.listen( "trackeventadded", onTrackEventAdded );
         track.listen( "trackeventremoved", onTrackEventRemoved );
@@ -8520,8 +8091,7 @@ define('core/views/media-view',[ "ui/page-element", "ui/logo-spinner", "util/lan
             "trackeventremoved",
             "trackeventupdated",
             "trackeventselected",
-            "trackeventdeselected",
-            "trackeventeditrequested"
+            "trackeventdeselected"
           ]);
           track.setPopcornWrapper( null );
           track.unlisten( "trackeventadded", onTrackEventAdded );
@@ -8842,17 +8412,1104 @@ define('core/views/media-view',[ "ui/page-element", "ui/logo-spinner", "util/lan
   });
 }());
 
+define('text!layouts/editor-area.html',[],function () { return '<div class="butter-editor-area">\n</div>';});
+
+define('text!layouts/toggler.html',[],function () { return '<div class="butter-toggle-button">\n\t<div class="image-container"></div>\n</div>';});
+
+/* This Source Code Form is subject to the terms of the MIT license
+ * If a copy of the MIT license was not distributed with this file, you can
+ * obtain one at http://www.mozillapopcorn.org/butter-license.txt */
+
+define('ui/toggler',[ "util/lang", "text!layouts/toggler.html" ],
+  function( LangUtils, TOGGLER_LAYOUT ){
+
+  return function( clickHandler, elementTitle, startState ){
+    var _element = LangUtils.domFragment( TOGGLER_LAYOUT );
+
+    if ( startState !== false && startState !== true ) {
+      startState = false;
+    }
+
+    _element.title = elementTitle || "Show/Hide";
+
+    if ( clickHandler ) {
+      _element.addEventListener( "click", clickHandler, false );
+    }
+
+    Object.defineProperties( this, {
+      element: {
+        enumerable: true,
+        get: function(){
+          return _element;
+        }
+      },
+      state: {
+        enumerable: true,
+        get: function() {
+          return _element.classList.contains( "toggled" );
+        },
+        set: function( state ) {
+          if ( state ) {
+            _element.classList.add( "toggled" );
+          }
+          else {
+            _element.classList.remove( "toggled" );
+          }
+        }
+      },
+      visible: {
+        enumerable: true,
+        get: function(){
+          return _element.style.display !== "none";
+        },
+        set: function( val ){
+          _element.style.display = val ? "block" : "none";
+        }
+      }
+    });
+
+    this.state = startState;
+
+  };
+});
+
+define('text!editor/default.html',[],function () { return '<!--  This Source Code Form is subject to the terms of the MIT license\n      If a copy of the MIT license was not distributed with this file, you can\n      obtain one at http://www.mozillapopcorn.org/butter-license.txt -->\n\n<div class="butter-editor">\n  <h1>Track Event Editor</h1>\n  <div class="error-message-container">\n    <div class="error-message"></div>\n  </div>\n</div>\n';});
+
+define('text!dialog/dialogs/error-message.html',[],function () { return '<!--  This Source Code Form is subject to the terms of the MIT license\n      If a copy of the MIT license was not distributed with this file, you can\n      obtain one at http://www.mozillapopcorn.org/butter-license.txt -->\n\n<div class="butter-dialog">\n  <div class="container" class="hbox center">\n    <div class="vbox center">\n      <h1><span class="message">Error</span></h1>\n    </div>\n  </div>\n  <div class="close-button"></div>\n</div>\n';});
+
+/* This Source Code Form is subject to the terms of the MIT license
+ * If a copy of the MIT license was not distributed with this file, you can
+ * obtain one at http://www.mozillapopcorn.org/butter-license.txt */
+
+define('dialog/dialogs/error-message',[ "text!dialog/dialogs/error-message.html", "dialog/dialog" ],
+  function( LAYOUT_SRC, Dialog ){
+
+  Dialog.register( "error-message", LAYOUT_SRC, function( dialog, data ) {
+    var message = dialog.rootElement.querySelector( ".message" );
+    message.innerHTML = data;
+    dialog.enableCloseButton();
+    dialog.assignEscapeKey( "default-close" );
+    dialog.assignEnterKey( "default-ok" );
+  });
+});
+define('text!dialog/dialogs/track-data.html',[],function () { return '<!--  This Source Code Form is subject to the terms of the MIT license\n      If a copy of the MIT license was not distributed with this file, you can\n      obtain one at http://www.mozillapopcorn.org/butter-license.txt -->\n\n<div class="butter-dialog">\n  <h1>Data for <span class="track-name"></span></h1>\n  <div class="container hbox center">\n    <div class="content vbox center">\n      <textarea class="track-data main-textarea" readonly>Please wait...</textarea>\n    </div>\n  </div>\n  <div class="error"></div>\n  <div class="buttons vbox center">\n    <button class="butter-dialog-button update">Update</button>\n  </div>\n  <div class="close-button"></div>\n</div>\n';});
+
+/* This Source Code Form is subject to the terms of the MIT license
+ * If a copy of the MIT license was not distributed with this file, you can
+ * obtain one at http://www.mozillapopcorn.org/butter-license.txt */
+
+define('dialog/dialogs/track-data',[ "text!dialog/dialogs/track-data.html", "dialog/dialog" ],
+  function( LAYOUT_SRC, Dialog ){
+
+  Dialog.register( "track-data", LAYOUT_SRC, function ( dialog, track ) {
+    var rootElement = dialog.rootElement;
+
+    var trackName = rootElement.querySelector( ".track-name" ),
+        trackData = rootElement.querySelector( ".track-data" );
+
+    var data = track.json;
+
+    dialog.listen( "error", function ( e ) {
+      dialog.showError( "Invalid JSON" );
+    });
+
+    dialog.registerActivity( "update", function ( e ){
+      dialog.hideError();
+      dialog.send( "submit", trackData.value );
+    });
+
+    dialog.assignButton( ".update", "update" );
+
+    trackName.innerHTML = data.name;
+    trackData.value = JSON.stringify( data );
+    dialog.enableCloseButton();
+    dialog.enableElements( ".update" );
+    dialog.assignEscapeKey( "default-close" );
+    dialog.assignEnterKey( "update" );
+    trackData.removeAttribute( "readonly" );
+    trackData.addEventListener( "keyup", function ( e ) {
+      dialog.hideError();
+    }, false );
+
+  });
+});
+define('text!dialog/dialogs/delete-track.html',[],function () { return '<!--  This Source Code Form is subject to the terms of the MIT license\n      If a copy of the MIT license was not distributed with this file, you can\n      obtain one at http://www.mozillapopcorn.org/butter-license.txt -->\n\n<div class="butter-dialog small">\n  <div class="container hbox center">\n    <div class="content vbox center">\n      <h1>Are you sure you want to delete <span class="track-name"></span>?</h1>\n    </div>\n  </div>\n  <div class="buttons" class="vbox center">\n    <button class="butter-dialog-button yes">Yes</button>\n    <button class="butter-dialog-button no">No</button>\n  </div>\n  <div class="close-button"></div>\n</div>\n';});
+
+/* This Source Code Form is subject to the terms of the MIT license
+ * If a copy of the MIT license was not distributed with this file, you can
+ * obtain one at http://www.mozillapopcorn.org/butter-license.txt */
+
+define('dialog/dialogs/delete-track',[ "text!dialog/dialogs/delete-track.html", "dialog/dialog" ],
+  function( LAYOUT_SRC, Dialog ){
+
+  Dialog.register( "delete-track", LAYOUT_SRC, function( dialog, trackName ) {
+    dialog.registerActivity( "ok", function( e ){
+      dialog.send( "submit", true );
+    });
+
+    dialog.rootElement.querySelector( ".track-name" )
+      .appendChild( document.createTextNode( trackName ) );
+
+    dialog.enableElements( ".yes", ".no" );
+    dialog.enableCloseButton();
+    dialog.assignEscapeKey( "default-close" );
+    dialog.assignEnterKey( "ok" );
+    dialog.assignButton( ".yes", "ok" );
+    dialog.assignButton( ".no", "default-close" );
+  });
+});
+define('text!dialog/dialogs/export.html',[],function () { return '<!--  This Source Code Form is subject to the terms of the MIT license\n      If a copy of the MIT license was not distributed with this file, you can\n      obtain one at http://www.mozillapopcorn.org/butter-license.txt -->\n\n<div class="butter-dialog">\n  <h1><span class="title"></span></h1>\n  <div class="container hbox center">\n    <div class=" vbox center">\n      <textarea class="json-export main-textarea" readonly>Please wait...</textarea>\n      <textarea class="html-export main-textarea" readonly>Please wait...</textarea>\n    </div>\n  </div>\n  <div class="buttons vbox center">\n    <button class="json-button butter-dialog-button button-blue">Get JSON</button>\n    <button class="html-button butter-dialog-button button-blue">Get HTML</button>\n  </div>\n  <div class="close-button"></div>\n</div>\n';});
+
+/* This Source Code Form is subject to the terms of the MIT license
+ * If a copy of the MIT license was not distributed with this file, you can
+ * obtain one at http://www.mozillapopcorn.org/butter-license.txt */
+
+define('dialog/dialogs/export',[ "text!dialog/dialogs/export.html", "dialog/dialog" ],
+  function( LAYOUT_SRC, Dialog ){
+
+  Dialog.register( "export", LAYOUT_SRC, function( dialog, exportData ) {
+
+    var rootElement = dialog.rootElement;
+
+    var jsonButton = rootElement.querySelector( ".json-button" ),
+        htmlButton = rootElement.querySelector( ".html-button" ),
+        jsonExport = rootElement.querySelector( ".json-export" ),
+        htmlExport = rootElement.querySelector( ".html-export" ),
+        title = rootElement.querySelector( ".title" );
+
+    title.innerHTML = "HTML Export";
+
+    jsonButton.addEventListener( "click", function( e ){
+      title.innerHTML = "Project JSON Data";
+      htmlExport.style.display = "none";
+      jsonExport.style.display = "block";
+      dialog.disableElements( ".json-button" );
+      dialog.enableElements( ".html-button" );
+    }, false );
+
+    htmlButton.addEventListener( "click", function( e ){
+      title.innerHTML = "HTML Export";
+      htmlExport.style.display = "block";
+      jsonExport.style.display = "none";
+      dialog.disableElements( ".html-button" );
+      dialog.enableElements( ".json-button" );
+    }, false );
+
+    try{
+      jsonExport.value = JSON.stringify( exportData.json, null, 2 );
+    }
+    catch( e ){
+      jsonExport.value = "There was an error trying to parse the JSON blob for this project. Please file a bug at https://webmademovies.lighthouseapp.com/projects/65733-butter/ and let us know.";
+    }
+
+    htmlExport.value = exportData.html;
+    dialog.enableCloseButton();
+    dialog.assignEscapeKey( "default-close" );
+    dialog.assignEnterKey( "default-close" );
+    dialog.disableElements( ".html-button" );
+  });
+});
+
+
+define('text!dialog/dialogs/quit-confirmation.html',[],function () { return '<!--  This Source Code Form is subject to the terms of the MIT license\n      If a copy of the MIT license was not distributed with this file, you can\n      obtain one at http://www.mozillapopcorn.org/butter-license.txt -->\n\n<div class="butter-dialog">\n  <div class="container hbox center">\n    <div class="content vbox center">\n      <h1>Are you sure you want to leave?</h1>\n    </div>\n  </div>\n  <div class="buttons hbox center">\n    <button class="butter-dialog-button yes">Yes</button>\n    <button class="butter-dialog-button no">No</button>\n  </div>\n  <div class="close-button" />\n</div>\n';});
+
+/* This Source Code Form is subject to the terms of the MIT license
+ * If a copy of the MIT license was not distributed with this file, you can
+ * obtain one at http://www.mozillapopcorn.org/butter-license.txt */
+
+define('dialog/dialogs/quit-confirmation',[ "text!dialog/dialogs/quit-confirmation.html", "dialog/dialog" ],
+  function( LAYOUT_SRC, Dialog ){
+
+  Dialog.register( "quit-confirmation", LAYOUT_SRC, function( dialog ) {
+    dialog.assignButton( ".yes", "default-ok" );
+    dialog.assignButton( ".no", "default-close" );
+    dialog.assignEnterKey( "default-ok" );
+    dialog.assignEscapeKey( "default-close" );
+    dialog.enableCloseButton();
+  });
+});
+define('text!dialog/dialogs/save-as.html',[],function () { return '<!--  This Source Code Form is subject to the terms of the MIT license\n      If a copy of the MIT license was not distributed with this file, you can\n      obtain one at http://www.mozillapopcorn.org/butter-license.txt -->\n\n<div class="butter-dialog small">\n  <h1>Please give your project a<span class="better"> better</span> name:</h1>\n  <div class="container hbox center">\n    <div class="content vbox center">\n      <input type="text" class="name-input" />\n    </div>\n  </div>\n  <div class="buttons hbox center">\n    <button class="butter-dialog-button save">Save</button>\n  </div>\n  <div class="close-button"></div>\n</div>\n';});
+
+/* This Source Code Form is subject to the terms of the MIT license
+ * If a copy of the MIT license was not distributed with this file, you can
+ * obtain one at http://www.mozillapopcorn.org/butter-license.txt */
+
+define('dialog/dialogs/save-as',[ "text!dialog/dialogs/save-as.html", "dialog/dialog" ],
+  function( LAYOUT_SRC, Dialog ){
+
+  Dialog.register( "save-as", LAYOUT_SRC, function( dialog, name ) {
+    var nameInput = dialog.rootElement.querySelector( ".name-input" );
+
+    dialog.registerActivity( "save", function( e ){
+      if( nameInput.value.replace( /\s/g, "" ) !== "" ){
+        dialog.send( "submit", nameInput.value );
+      }
+      else{
+        dialog.rootElement.querySelector( ".better" ).style.display = "inline";
+      }
+    });
+
+    dialog.enableCloseButton();
+    dialog.assignEscapeKey( "default-close" );
+    dialog.assignEnterKey( "save" );
+    dialog.assignButton( ".save", "save" );
+
+    nameInput.value = name || "";
+  });
+});
+
+define('text!dialog/dialogs/share.html',[],function () { return '<!--  This Source Code Form is subject to the terms of the MIT license\n      If a copy of the MIT license was not distributed with this file, you can\n      obtain one at http://www.mozillapopcorn.org/butter-license.txt -->\n\n<div class="butter-dialog share small">\n  <h1>Share URL:</h1>\n  <div class="container hbox center">\n    <div class="content vbox center">\n      <div class="url">\n        <span>Please wait...</span><a target="_blank" href="#" class="url-text"></a>\n      </div>\n    </div>\n  </div>\n  <div class="close-button"></div>\n</div>\n';});
+
+/* This Source Code Form is subject to the terms of the MIT license
+ * If a copy of the MIT license was not distributed with this file, you can
+ * obtain one at http://www.mozillapopcorn.org/butter-license.txt */
+
+define('dialog/dialogs/share',[ "text!dialog/dialogs/share.html", "dialog/dialog" ],
+  function( LAYOUT_SRC, Dialog ){
+
+  Dialog.register( "share", LAYOUT_SRC, function( dialog, data ) {
+    var url = dialog.rootElement.querySelector( ".url-text" );
+
+    var container = dialog.rootElement.querySelector( ".url" );
+    container.removeChild( container.querySelectorAll( "span" )[ 0 ] );
+    url.innerHTML = data;
+    url.href = data;
+    
+    dialog.enableCloseButton();
+    dialog.assignEscapeKey( "default-close" );
+    dialog.assignEnterKey( "default-close" );
+    
+  });
+});
+
+/* This Source Code Form is subject to the terms of the MIT license
+ * If a copy of the MIT license was not distributed with this file, you can
+ * obtain one at http://www.mozillapopcorn.org/butter-license.txt */
+
+define('dialogs',[
+  "dialog/dialogs/error-message",
+  "dialog/dialogs/track-data",
+  "dialog/dialogs/delete-track",
+  "dialog/dialogs/export",
+  "dialog/dialogs/quit-confirmation",
+  "dialog/dialogs/save-as",
+  "dialog/dialogs/share",
+], function() {} );
+
+define('text!layouts/trackevent-editor-defaults.html',[],function () { return '<!--  This Source Code Form is subject to the terms of the MIT license\n      If a copy of the MIT license was not distributed with this file, you can\n      obtain one at http://www.mozillapopcorn.org/butter-license.txt -->\n\n<div class="trackevent-property default input">\n  <div class="property-name"></div>\n  <input class="value" type="text" />\n</div>\n\n<div class="trackevent-property select">\n  <div class="property-name"></div>\n  <select>\n  </select>\n</div>\n\n<div class="trackevent-property targets">\n  <div class="property-name">Target</div>\n  <select data-manifest-key="target">\n    <option class="default-target-option" value="Media Element">Media Element</option>\n  </select>\n</div>';});
+
+/* This Source Code Form is subject to the terms of the MIT license
+ * If a copy of the MIT license was not distributed with this file, you can
+ * obtain one at http://www.mozillapopcorn.org/butter-license.txt */
+
+/**
+ * Module: Editor
+ */
+define('editor/editor',[ "core/eventmanager", "util/lang", "util/xhr",
+          "util/keys", "text!layouts/trackevent-editor-defaults.html" ],
+        function( EventManagerWrapper, LangUtils, XHRUtils,
+          KeysUtils, DEFAULT_LAYOUT_SNIPPETS ) {
+
+  var __editors = {},
+      __defaultLayouts = LangUtils.domFragment( DEFAULT_LAYOUT_SNIPPETS ),
+      __safeKeyUpKeys = [
+                          KeysUtils.LEFT,
+                          KeysUtils.UP,
+                          KeysUtils.RIGHT,
+                          KeysUtils.DOWN,
+                          KeysUtils.DELETE,
+                          KeysUtils.TAB,
+                          KeysUtils.ESCAPE
+                        ];
+
+  /**
+   * Namespace: Editor
+   */
+  var Editor = {
+
+    /**
+     * Class: BaseEditor
+     *
+     * Extends a given object to be a BaseEditor, giving it rudamentary editor capabilities
+     *
+     * @param {Object} extendObject: Object to be extended as a BaseEditor
+     * @param {Butter} butter: An instance of Butter
+     * @param {DOMElement} rootElement: The root element to which the editor's content will be attached
+     * @param {Object} events: Events such as 'open' and 'close' can be defined on this object to be called at the appropriate times
+     */
+    BaseEditor: function( extendObject, butter, rootElement, events ){
+
+      EventManagerWrapper( extendObject );
+
+      extendObject.butter = butter;
+      extendObject.rootElement = rootElement;
+      extendObject.parentElement = null;
+
+      /**
+       * Member: open
+       *
+       * Opens the editor
+       *
+       * @param {DOMElement} parentElement: The element to which the editor's root will be attached
+       */
+      extendObject.open = function( parentElement ) {
+        extendObject.parentElement = parentElement;
+
+        // If an open event existed on the events object passed into the constructor, call it
+        if ( events.open ) {
+          events.open.apply( extendObject, arguments );
+        }
+
+        // Attach the editor's root element to the given parentElement
+        extendObject.parentElement.appendChild( extendObject.rootElement );
+        extendObject.dispatch( "open" );
+      };
+
+      /**
+       * Member: close
+       *
+       * Closes the editor
+       */
+      extendObject.close = function() {
+        // Remove the editor's root element from the element to which it was attached
+        extendObject.rootElement.parentNode.removeChild( extendObject.rootElement );
+
+        // If a close event existed on the events object passed into the constructor, call it
+        if ( events.close ) {
+          events.close.apply( extendObject, arguments );
+        }
+
+        extendObject.dispatch( "closed" );
+      };
+
+      extendObject.defaultLayouts = __defaultLayouts.cloneNode( true );
+
+      /**
+       * Member: createTargetsList
+       *
+       * Creates a list of targets in a <select>, including one specifically for "Media Element"
+       */
+      extendObject.createTargetsList = function( targets ) {
+        var propertyRootElement = __defaultLayouts.querySelector( ".trackevent-property.targets" ).cloneNode( true ),
+            selectElement = propertyRootElement.querySelector( "select" ),
+            mediaOptionElement = selectElement.firstChild,
+            optionElement;
+
+        // Create one <option> per target
+        for ( var i = 1; i < targets.length; ++i ) {
+          optionElement = document.createElement( "option" );
+          optionElement.value = targets[ i ].element.id;
+          optionElement.innerHTML = targets[ i ].element.id;
+
+          // If the default target <option> (for Media Element) exists, place them before it
+          if ( mediaOptionElement ) {
+            selectElement.insertBefore( optionElement, mediaOptionElement );
+          }
+          else {
+            selectElement.appendChild( optionElement );
+          }
+        }
+
+        return propertyRootElement;
+      };
+
+      /**
+       * Member: attachSelectChangeHandler
+       *
+       * Attaches a handler to the change event from a <select> element and updates the TrackEvent corresponding to the given property name
+       *
+       * @param {DOMElement} element: Element to which handler is attached
+       * @param {TrackEvent} trackEvent: TrackEvent to update
+       * @param {String} propertyName: Name of property to update when change is detected
+       */
+      extendObject.attachSelectChangeHandler = function( element, trackEvent, propertyName ) {
+        element.addEventListener( "change", function( e ) {
+          var updateOptions = {};
+          updateOptions[ propertyName ] = element.value;
+          trackEvent.update( updateOptions );
+
+          // Attempt to make the trackEvent's target blink
+          var target = extendObject.butter.getTargetByType( "elementID", trackEvent.popcornOptions.target );
+          if( target ) {
+            target.view.blink();
+          }
+          else {
+            extendObject.butter.currentMedia.view.blink();
+          }
+        }, false );
+      };
+
+      /**
+       * Member: attachStartEndHandler
+       *
+       * Attaches handlers to an element (likely an <input>) and updates the TrackEvent corresponding to the given property name.
+       * Special consideration is given to properties like "start" and "end" that can't be blank. On keyup event, update only when
+       * appropriate.
+       *
+       * @param {DOMElement} element: Element to which handler is attached
+       * @param {TrackEvent} trackEvent: TrackEvent to update
+       * @param {String} propertyName: Name of property to update when change is detected
+       * @param {Function} callback: Called when update is ready to occur
+       */
+       extendObject.attachStartEndHandler = function( element, trackEvent, propertyName, callback ) {
+        element.addEventListener( "blur", function( e ) {
+          var updateOptions = {};
+          updateOptions[ propertyName ] = element.value;
+          callback( trackEvent, updateOptions );
+        }, false );
+        element.addEventListener( "keyup", function( e ) {
+          if ( __safeKeyUpKeys.indexOf( e.which ) > -1 ) {
+            return;
+          }
+          // Check if value is only whitespace, and don't bother updating if it is
+          var value = element.value.replace( /\s/g, "" );
+          if ( value && value.length > 0 ) {
+            var updateOptions = {};
+            updateOptions[ propertyName ] = value;
+
+            // Perhaps the user isn't finished typing something that includes decimals
+            if ( value.charAt( value.length - 1 ) !== "." ) {
+              callback( trackEvent, updateOptions );
+            }
+          }
+        }, false );
+      };
+
+      /**
+       * Member: attachCheckboxChangeHandler
+       *
+       * Attaches handlers to a checkbox element and updates the TrackEvent corresponding to the given property name
+       *
+       * @param {DOMElement} element: Element to which handler is attached
+       * @param {TrackEvent} trackEvent: TrackEvent to update
+       * @param {String} propertyName: Name of property to update when change is detected
+       */
+      extendObject.attachCheckboxChangeHandler = function( element, trackEvent, propertyName ) {
+        element.addEventListener( "click", function( e ) {
+          var updateOptions = {};
+          updateOptions[ propertyName ] = element.checked;
+          trackEvent.update( updateOptions );
+        }, false );
+      };
+
+      /**
+       * Member: attachInputChangeHandler
+       *
+       * Attaches handlers to a checkbox element and updates the TrackEvent corresponding to the given property name
+       *
+       * @param {DOMElement} element: Element to which handler is attached
+       * @param {TrackEvent} trackEvent: TrackEvent to update
+       * @param {String} propertyName: Name of property to update when change is detected
+       */
+       extendObject.attachInputChangeHandler = function( element, trackEvent, propertyName ) {
+        element.addEventListener( "blur", function( e ) {
+          var updateOptions = {};
+          updateOptions[ propertyName ] = element.value;
+          trackEvent.update( updateOptions );
+        }, false );
+        element.addEventListener( "keyup", function( e ) {
+          if ( __safeKeyUpKeys.indexOf( e.which ) > -1 ) {
+            return;
+          }
+          var updateOptions = {};
+          updateOptions[ propertyName ] = element.value;
+          trackEvent.update( updateOptions );
+        }, false );
+      };
+
+      /**
+       * Member: createManifestItem
+       *
+       * Creates an element according to the manifest of the TrackEvent
+       *
+       * @param {String} name: Name of the manifest item to represent
+       * @param {Object} manifestEntry: The manifest entry from a Popcorn plugin
+       * @param {*} data: Initial data to insert in the created element
+       * @param {TrackEvent} trackEvent: TrackEvent to which handlers will be attached
+       * @param {Function} itemCallback: Optional. Called for each item, for the user to add functionality after creation
+       */
+      extendObject.createManifestItem = function( name, manifestEntry, data, trackEvent, itemCallback ) {
+        var elem = manifestEntry.elem || "default",
+            propertyArchetype = __defaultLayouts.querySelector( ".trackevent-property." + elem ).cloneNode( true ),
+            editorElement,
+            itemLabel = manifestEntry.label || name,
+            option,
+            i, l;
+
+        // Treat 'in' and 'out' specially, changing their titles to 'Start' and 'End' respectively
+        if ( itemLabel === "In" ) {
+          itemLabel = "Start (seconds)";
+        } else if ( itemLabel === "Out" ) {
+          itemLabel = "End (seconds)";
+        }
+
+        // Grab the element with class 'property-name' to supply the archetype for new manifest entries
+        propertyArchetype.querySelector( ".property-name" ).innerHTML = itemLabel;
+
+        // If the manifest's 'elem' property is 'select', create a <select> element. Otherwise, create an
+        // <input>.
+        if ( manifestEntry.elem === "select" ) {
+          editorElement = propertyArchetype.querySelector( "select" );
+
+          // data-manifest-key is used to update this property later on
+          editorElement.setAttribute( "data-manifest-key", name );
+
+          if ( manifestEntry.options ) {
+            for ( i = 0, l = manifestEntry.options.length; i < l; ++i ){
+              option = document.createElement( "option" );
+              option.value = option.innerHTML = manifestEntry.options[ i ];
+              editorElement.appendChild( option );
+            }
+          }
+        }
+        else {
+          editorElement = propertyArchetype.querySelector( "input" );
+          if ( data ) {
+            // Don't print "undefined" or the like
+            if ( data === undefined || typeof data === "object" ) {
+              if ( manifestEntry.default ) {
+                data = manifestEntry.default;
+              } else {
+                data = manifestEntry.type === "number" ? 0 : "";
+              }
+            }
+            editorElement.value = data;
+          }
+          editorElement.type = manifestEntry.type;
+
+          // data-manifest-key is used to update this property later on
+          editorElement.setAttribute( "data-manifest-key", name );
+
+        }
+
+        if ( itemCallback ) {
+          itemCallback( manifestEntry.elem, editorElement, trackEvent, name );
+        }
+
+        return propertyArchetype;
+      };
+
+      /**
+       * Member: updatePropertiesFromManifest
+       *
+       * Updates TrackEvent properties visible in the editor with respect to the TrackEvent's manifest
+       *
+       * @param {TrackEvent} trackEvent: TrackEvent which supplies the manifest and property updates
+       */
+      extendObject.updatePropertiesFromManifest = function ( trackEvent, manifestKeys, forceTarget ) {
+        var element,
+            popcornOptions = trackEvent.popcornOptions,
+            manifestOptions = trackEvent.manifest.options,
+            option,
+            i, l;
+
+        manifestKeys = manifestKeys || Object.keys( manifestOptions );
+
+        if ( forceTarget && manifestKeys.indexOf( "target" ) === -1 ) {
+          manifestKeys = manifestKeys.concat( "target" );
+        }
+
+        for ( i = 0, l = manifestKeys.length; i < l; ++i ) {
+          option = manifestKeys[ i ];
+
+          // Look for the element with the correct manifest-key which was attached to an element during creation of the editor
+          element = extendObject.rootElement.querySelector( "[data-manifest-key='" + option + "']" );
+
+          if ( element ) {
+            // Checkbox elements need to be treated specially to manipulate the 'checked' property
+            if ( element.type === "checkbox" ) {
+              element.checked = popcornOptions[ option ];
+            }
+            else {
+              element.value = popcornOptions[ option ];
+            }
+          }
+        }
+      };
+
+
+
+      /**
+       * Member: createPropertiesFromManifest
+       *
+       * Creates editable elements according to the properties on the manifest of the given TrackEvent
+       *
+       * @param {TrackEvent} trackEvent: TrackEvent from which manifest will be retrieved
+       * @param {Function} itemCallback: Callback which is passed to createManifestItem for each element created
+       * @param {Array} manifestKeys: Optional. If only specific keys are desired from the manifest, use them
+       * @param {DOMElement} container: Optional. If specified, elements will be inserted into container, not rootElement
+       * @param {Array} ignoreManifestKeys: Optional. Keys in this array are ignored such that elements for them are not created
+       */
+      extendObject.createPropertiesFromManifest = function( trackEvent, itemCallback, manifestKeys, container, ignoreManifestKeys ) {
+        var manifestOptions,
+            item,
+            element,
+            i, l;
+
+        container = container || extendObject.rootElement;
+
+        if ( !trackEvent.manifest ) {
+          throw "Unable to create properties from null manifest. Perhaps trackevent is not initialized properly yet.";
+        }
+
+        manifestOptions = trackEvent.manifest.options;
+        manifestKeys = manifestKeys || Object.keys( manifestOptions );
+
+        for ( i = 0, l = manifestKeys.length; i < l; ++i ) {
+          item = manifestKeys[ i ];
+          if ( ignoreManifestKeys && ignoreManifestKeys.indexOf( item ) > -1 ) {
+            continue;
+          }
+          element = extendObject.createManifestItem( item, manifestOptions[ item ], trackEvent.popcornOptions[ item ], trackEvent, itemCallback );
+          container.appendChild( element );
+        }
+      };
+
+    },
+
+    /**
+     * Function: register
+     *
+     * Extends a given object to be a BaseEditor, giving it rudamentary editor capabilities
+     *
+     * @param {String} name: Name of the editor
+     * @param {String} layoutSrc: String representing the basic HTML layout of the editor
+     * @param {Function} ctor: Constructor to be run when the Editor is being created
+     */
+    register: function( name, layoutSrc, ctor ) {
+      __editors[ name ] = {
+        create: ctor,
+        layout: layoutSrc
+      };
+    },
+
+    /**
+     * Function: create
+     *
+     * Creates an editor
+     *
+     * @param {String} editorName: Name of the editor to create
+     * @param {Butter} butter: An instance of Butter
+     */
+    create: function( editorName, butter ) {
+      var description = __editors[ editorName ],
+
+          // Collect the element labeled with the 'butter-editor' class to avoid other elements (such as comments)
+          // which may exist in the layout.
+          compiledLayout = LangUtils.domFragment( description.layout );
+
+      // If domFragment returned a DOMFragment (not an actual element) try to get the proper element out of it
+      if ( !compiledLayout.classList ) {
+        compiledLayout = compiledLayout.querySelector( ".butter-editor" );
+      }
+
+      if ( !compiledLayout ) {
+        throw new Error( "Editor layout not formatted properly." );
+      }
+
+      return new description.create( compiledLayout, butter );
+    },
+
+    /**
+     * Function: create
+     *
+     * Reports the existence of an editor given a name
+     *
+     * @param {String} name: Name of the editor of which existence will be verified
+     */
+    isRegistered: function( name ) {
+      return !!__editors[ name ];
+    },
+
+    /**
+     * Function: loadLayout
+     *
+     * Loads a layout from the specified src
+     *
+     * @param {String} src: The source from which the layout will be loaded
+     */
+    loadLayout: function( src, readyCallback ) {
+      if ( src.indexOf( "{{baseDir}}" ) > -1 ) {
+        src = src.replace( "{{baseDir}}", Editor.baseDir );
+      }
+      XHRUtils.get( src, function( e ) {
+        if ( e.target.readyState === 4 ){
+          readyCallback( e.target.responseText );
+        }
+      }, "text/plain" );
+
+    },
+
+    // will be set by Editor module when it loads
+    baseDir: null
+
+  };
+
+  return Editor;
+
+});
+
+/* This Source Code Form is subject to the terms of the MIT license
+ * If a copy of the MIT license was not distributed with this file, you can
+ * obtain one at http://www.mozillapopcorn.org/butter-license.txt */
+
+define('editor/default',[ "text!./default.html", "editor/editor" ],
+  function( LAYOUT_SRC, Editor ) {
+
+  /**
+   * Class: DefaultEditor
+   *
+   * Implements the default editor as a general fallback editor
+   *
+   * @param {DOMElement} rootElement: Root DOM element containing the fundamental editor content
+   * @param {Butter} butter: An instance of Butter
+   * @param {TrackEvent} TrackEvent: The TrackEvent to edit
+   */
+  Editor.register( "default", LAYOUT_SRC, function( rootElement, butter ) {
+
+    var _this = this;
+
+    var _rootElement = rootElement,
+        _trackEvent,
+        _targets = [ butter.currentMedia ].concat( butter.targets ),
+        _messageContainer = _rootElement.querySelector( "div.error-message" );
+
+    /**
+     * Member: setErrorState
+     *
+     * Sets the error state of the editor, making an error message visible
+     *
+     * @param {String} message: Error message to display
+     */
+    function setErrorState ( message ) {
+      if ( message ) {
+        _messageContainer.innerHTML = message;
+        _messageContainer.parentNode.style.height = _messageContainer.offsetHeight + "px";
+        _messageContainer.parentNode.style.visibility = "visible";
+        _messageContainer.parentNode.classList.add( "open" );
+      }
+      else {
+        _messageContainer.innerHTML = "";
+        _messageContainer.parentNode.style.height = "";
+        _messageContainer.parentNode.style.visibility = "";
+        _messageContainer.parentNode.classList.remove( "open" );
+      }
+    }
+
+    function onTrackEventUpdated( e ) {
+      _this.updatePropertiesFromManifest( e.target );
+      setErrorState( false );
+    }
+
+    // Extend this object to become a BaseEditor
+    Editor.BaseEditor( _this, butter, rootElement, {
+      open: function ( parentElement, trackEvent ) {
+        var targetList,
+            selectElement;
+
+        _trackEvent = trackEvent;
+        _this.createPropertiesFromManifest( trackEvent,
+          function( elementType, element, trackEvent, name ){
+            if ( elementType === "select" ) {
+              _this.attachSelectChangeHandler( element, trackEvent, name, updateTrackEventWithoutTryCatch );
+            }
+            else {
+              if ( [ "start", "end" ].indexOf( name ) > -1 ) {
+                _this.attachStartEndHandler( element, trackEvent, name, updateTrackEventWithTryCatch );
+              }
+              else {
+                if ( element.type === "checkbox" ) {
+                  _this.attachCheckboxChangeHandler( element, trackEvent, name, updateTrackEventWithoutTryCatch );
+                }
+                else {
+                  _this.attachInputChangeHandler( element, trackEvent, name, updateTrackEventWithoutTryCatch );
+                }
+                
+              }
+            }
+          }, null, null, [ 'target' ] );
+
+        targetList = _this.createTargetsList( _targets );
+        selectElement = targetList.querySelector( "select" );
+        // Attach the onchange handler to trackEvent is updated when <select> is changed
+        _this.attachSelectChangeHandler( selectElement, trackEvent, "target" );
+        _rootElement.appendChild( targetList );
+
+        _this.updatePropertiesFromManifest( trackEvent, null, true );
+
+        // Update properties when TrackEvent is updated
+        trackEvent.listen( "trackeventupdated", onTrackEventUpdated );
+      },
+      close: function () {
+        _trackEvent.unlisten( "trackeventupdated", onTrackEventUpdated );
+      }
+    });
+
+    /**
+     * Member: updateTrackEventWithoutTryCatch
+     *
+     * Simple handler for updating a TrackEvent when needed
+     *
+     * @param {TrackEvent} trackEvent: TrackEvent to update
+     * @param {Object} updateOptions: TrackEvent properties to update
+     */
+    function updateTrackEventWithoutTryCatch( trackEvent, updateOptions ) {
+      trackEvent.update( updateOptions );
+    }
+
+    /**
+     * Member: updateTrackEventWithTryCatch
+     *
+     * Attempt to update the properties of a TrackEvent; set the error state if a failure occurs.
+     *
+     * @param {TrackEvent} trackEvent: TrackEvent to update
+     * @param {Object} properties: TrackEvent properties to update
+     */
+    function updateTrackEventWithTryCatch( trackEvent, properties ) {
+      try {
+        trackEvent.update( properties );
+      }
+      catch ( e ) {
+        setErrorState( e.toString() );
+      }
+    }
+
+  });
+
+});
+
+/* This Source Code Form is subject to the terms of the MIT license
+ * If a copy of the MIT license was not distributed with this file, you can
+ * obtain one at http://www.mozillapopcorn.org/butter-license.txt */
+
+/**
+ * Module: EditorModule
+ *
+ * Butter Module for Editors
+ */
+define('editor/module',[ "core/eventmanager", "core/trackevent", "./editor",
+          "ui/toggler", "util/lang", "text!layouts/editor-area.html",
+          "./default" ],
+  function( EventManagerWrapper, TrackEvent, Editor,
+            Toggler, LangUtils, EDITOR_AREA_LAYOUT,
+            DefaultEditor ){
+
+  /**
+   * Class: EventEditor
+   *
+   * Module which provides Editor functionality to Butter
+   */
+  function EventEditor( butter, moduleOptions ){
+
+    moduleOptions = moduleOptions || {};
+
+    var _currentEditor,
+        _firstUse = false,
+        _editorAreaDOMRoot = LangUtils.domFragment( EDITOR_AREA_LAYOUT ),
+        _toggler,
+        _this = this;
+
+    EventManagerWrapper( _this );
+
+    /**
+     * Member: openEditor
+     *
+     * Open the editor corresponding to the type of the given TrackEvent
+     *
+     * @param {TrackEvent} trackEvent: TrackEvent to edit
+     */
+    function openEditor( trackEvent ) {
+      // If the editor has never been used before, open it now
+      if ( !_firstUse ) {
+        _firstUse = true;
+        _editorAreaDOMRoot.classList.remove( "minimized" );
+        _toggler.state = false;
+      }
+
+      var editorType = Editor.isRegistered( trackEvent.type ) ? trackEvent.type : "default";
+      if( _currentEditor ) {
+        _currentEditor.close();
+      }
+      _currentEditor = Editor.create( editorType, butter );
+      _currentEditor.open( _editorAreaDOMRoot, trackEvent );
+      return _currentEditor;
+    }
+
+    // When a TrackEvent is somewhere in butter, open its editor immediately.
+    butter.listen( "trackeventcreated", function( e ){
+      if( [ "target", "media" ].indexOf( e.data.by ) > -1 && butter.ui.contentState === "timeline" ){
+        openEditor( e.data.trackEvent );
+      }
+    });
+
+    /**
+     * Member: edit
+     *
+     * Open the editor of corresponding to the type of the given TrackEvent
+     *
+     * @param {TrackEvent} trackEvent: TrackEvent to edit
+     */
+    this.edit = function( trackEvent ){
+      if ( !trackEvent || !( trackEvent instanceof TrackEvent ) ){
+        throw new Error( "trackEvent must be valid to start an editor." );
+      }
+      return openEditor( trackEvent );
+    };
+
+    butter.listen( "trackeventadded", function ( e ) {
+      var trackEvent = e.data;
+
+      // Open a new editor on a single click
+      var trackEventMouseUp = function ( e ) {
+        if( butter.selectedEvents.length === 1 && !trackEvent.dragging ){
+          openEditor( trackEvent );
+        }
+      };
+
+      // Always open the editor on a double-click
+      var onTrackEventDoubleClicked = function ( e ) {
+        _editorAreaDOMRoot.classList.remove( "minimized" );
+        _toggler.state = false;
+      };
+
+      trackEvent.view.element.addEventListener( "mouseup", trackEventMouseUp, true );
+      trackEvent.view.element.addEventListener( "dblclick", onTrackEventDoubleClicked, false );
+
+      butter.listen( "trackeventremoved", function ( e ) {
+        if ( e.data === trackEvent ) {
+          trackEvent.view.element.removeEventListener( "mouseup", trackEventMouseUp, true );
+          trackEvent.view.element.removeEventListener( "dblclick", onTrackEventDoubleClicked, false );
+        }
+      });
+
+    });
+
+    /**
+     * Member: _start
+     *
+     * Prepares this module for Butter startup
+     *
+     * @param {Function} onModuleReady: Callback to signify that module is ready
+     */
+    this._start = function( onModuleReady ){
+      onModuleReady();
+      if( butter.config.value( "ui" ).enabled !== false ){
+        butter.ui.areas.editor = new butter.ui.Area( "editor-area", _editorAreaDOMRoot );
+        _toggler = new Toggler( function( e ) {
+          var newState = !_editorAreaDOMRoot.classList.contains( "minimized" );
+          _toggler.state = newState;
+          if ( newState ) {
+            _editorAreaDOMRoot.classList.add( "minimized" );
+          }
+          else {
+            _editorAreaDOMRoot.classList.remove( "minimized" );
+          }
+        }, "Show/Hide Editor", true );
+        _editorAreaDOMRoot.appendChild( _toggler.element );
+        document.body.classList.add( "butter-editor-spacing" );
+
+        // Start minimized
+        _editorAreaDOMRoot.classList.add( "minimized" );
+
+        document.body.appendChild( _editorAreaDOMRoot );
+
+        var config = butter.config.value( "editor" );
+        for ( var editorName in config ) {
+          if ( config.hasOwnProperty( editorName ) ) {
+            butter.loader.load({
+              url: config[ editorName ],
+              type: "js"
+            });
+          }
+        }
+      }
+    };
+
+  }
+
+  this.register = Editor.register;
+
+  EventEditor.__moduleName = "editor";
+
+  return EventEditor;
+
+}); //define
+;
+/* This Source Code Form is subject to the terms of the MIT license
+ * If a copy of the MIT license was not distributed with this file, you can
+ * obtain one at http://www.mozillapopcorn.org/butter-license.txt */
+
+define('modules',[
+    "editor/module",
+    "timeline/module",
+    "cornfield/module",
+    "plugin/module"
+  ],
+  function(){
+
+  var moduleList = Array.prototype.slice.apply( arguments );
+
+  return function( butter, config, onReady ){
+
+    var modules = [],
+        loadedModules = 0,
+        readyModules = 0;
+
+    for( var i=0; i<moduleList.length; ++i ){
+      var name = moduleList[ i ].__moduleName;
+      butter[ name ] = new moduleList[ i ]( butter, config.value( name ) );
+      modules.push( butter[ name ] );
+    } //for
+
+    return {
+      load: function( onLoaded ){
+        function onModuleLoaded(){
+          loadedModules++;
+          if( loadedModules === modules.length ){
+            onLoaded();
+          }
+        }
+
+        for( var i=0; i<modules.length; ++i ){
+          if( modules[ i ]._load ){
+            modules[ i ]._load( onModuleLoaded );
+          }
+          else{
+            loadedModules++;
+          } //if
+        } //for
+
+        if( loadedModules === modules.length ){
+          onLoaded();
+        }
+      },
+      ready: function( onReady ){
+        function onModuleReady(){
+          readyModules++;
+          if( readyModules === modules.length ){
+            onReady();
+          }
+        }
+
+        for( var i=0; i<modules.length; ++i ){
+          if( modules[ i ]._start ){
+            modules[ i ]._start( onModuleReady );
+          }
+          else{
+            readyModules++;
+          } //if
+        } //for
+      }
+    };
+
+  };
+
+});
+
 define('text!layouts/header.html',[],function () { return '<div id="butter-header" data-butter-exclude>\n  <div class="butter-header-inner">\n    <div class="butter-logo"></div>\n    <span class="butter-name"></span>\n    <div class="butter-editor-actions">\n      <a class="butter-btn" href="/dashboard" id="butter-header-load" title="Manage your projects"><span class="icon-grear-sign"></span> Projects</a>\n      <a class="butter-btn" href="#" id="butter-header-save" title="Save your project"><span class="icon-ok-sign"></span> Save</a>\n      <a class="butter-btn" href="#" id="butter-header-source" title="View the source of this template"><span class="icon-eye-open"></span> View Source</a>\n      <a class="butter-btn" href="#" id="butter-header-share" title="Generate a link to share this project with the world"><span class="icon-share-alt"></span> Publish</a>\n      <a class="butter-btn" href="#" id="butter-header-auth" title="Sign in or sign up with Persona"><span class=\'icon-user\'></span>Sign In / Sign Up</a>\n    </div>\n  </div>\n</div>\n';});
 
-define('ui/header',[
-  "dialog/iframe-dialog",
-  "util/lang",
-  "text!layouts/header.html"
-], function(
-  IFrameDialog,
-  Lang,
-  HEADER_TEMPLATE
-) {
+define('ui/header',[ "dialog/dialog", "util/lang", "text!layouts/header.html" ],
+  function( Dialog, Lang, HEADER_TEMPLATE ){
 
   var DEFAULT_AUTH_BUTTON_TEXT = "<span class='icon-user'></span> Sign In / Sign Up",
       DEFAULT_AUTH_BUTTON_TITLE = "Sign in or sign up with Persona";
@@ -8887,21 +9544,10 @@ define('ui/header',[
         json: butter.exportProject()
       };
 
-      var dialog = new IFrameDialog({
-        type: "iframe",
-        modal: true,
-        url: butter.ui.dialogDir + "view-source.html",
-        events: {
-          open: function(){
-            dialog.send( "export", exportPackage );
-          },
-          cancel: function( e ){
-            dialog.close();
-          }
-        }
-      });
+      Dialog.spawn( "export", {
+        data: exportPackage,
+      }).open();
 
-      dialog.open();
     }, false );
 
     function authenticationRequired( successCallback, errorCallback ){
@@ -8928,15 +9574,12 @@ define('ui/header',[
       });
     }
 
+    _authButton.addEventListener( "click", authenticationRequired, false );
+
     function showErrorDialog( message, callback ){
-      var dialog = new IFrameDialog({
-        type: "iframe",
-        modal: true,
-        url: butter.ui.dialogDir + "error-message.html",
+      var dialog = Dialog.spawn( "error-message", {
+        data: message,
         events: {
-          open: function( e ){
-            dialog.send( "message", message );
-          },
           cancel: function( e ){
             dialog.close();
             if( callback ){
@@ -8957,21 +9600,9 @@ define('ui/header',[
           }
           else{
             var url = e.url;
-            var dialog = new IFrameDialog({
-              type: "iframe",
-              modal: true,
-              classes: "fade-in smallIframe",
-              url: butter.ui.dialogDir + "share.html",
-              events: {
-                open: function( e ){
-                  dialog.send( "url", url );
-                },
-                cancel: function( e ){
-                  dialog.close();
-                }
-              }
-            });
-            dialog.open();
+            Dialog.spawn( "share", {
+              data: url
+            }).open();
           }
         });
       }
@@ -8987,7 +9618,6 @@ define('ui/header',[
     function doSave( callback ){
 
       function execute(){
-        butter.project.html = butter.getHTML();
         butter.project.data = butter.exportProject();
         var saveString = JSON.stringify( butter.project, null, 4 );
         butter.ui.loadIndicator.start();
@@ -9001,26 +9631,17 @@ define('ui/header',[
           if( callback ){
             callback();
           }
+          butter.dispatch( "projectsaved" );
         });
       }
 
       if( !butter.project.name ){
-        var dialog = new IFrameDialog({
-          type: "iframe",
-          modal: true,
-          classes: "fade-in smallIframe",
-          url: butter.ui.dialogDir + "save-as.html",
+        var dialog = Dialog.spawn( "save-as", {
           events: {
-            open: function( e ){
-              dialog.send( "name", null );
-            },
             submit: function( e ){
               butter.project.name = e.data;
               dialog.close();
               execute();
-            },
-            cancel: function( e ){
-              dialog.close();
             }
           }
         });
@@ -9071,8 +9692,8 @@ define('ui/header',[
  * If a copy of the MIT license was not distributed with this file, you can
  * obtain one at http://www.mozillapopcorn.org/butter-license.txt */
 
-define('ui/ui',[ "core/eventmanager", "./toggler", "./logo-spinner", "./context-button", "./header" ],
-        function( EventManagerWrapper, Toggler, LogoSpinner, ContextButton, Header ){
+define('ui/ui',[ "core/eventmanager", "./toggler", "./logo-spinner", "./context-button", "./header", "./unload-dialog" ],
+        function( EventManagerWrapper, Toggler, LogoSpinner, ContextButton, Header, UnloadDialog ){
 
   var TRANSITION_DURATION = 500,
       BUTTER_CSS_FILE = "{css}/butter.ui.css";
@@ -9168,16 +9789,26 @@ define('ui/ui',[ "core/eventmanager", "./toggler", "./logo-spinner", "./context-
         _this = this;
 
     EventManagerWrapper( _this );
+    UnloadDialog( butter );
+
+    // Expose Area to external bodies through `butter.ui`
+    // Modules should be creating their own Areas when possible
+    _this.Area = Area;
 
     _areas.main = new Area( "butter-tray" );
 
     this.contentStateLocked = false;
 
     var _element = _areas.main.element,
-        _toggler = new Toggler( butter, _element );
+        _toggler = new Toggler( function ( e ) {
+          butter.ui.visible = !butter.ui.visible;
+          _toggler.state = butter.ui.visible;
+        }, "Show/Hide Timeline" );
 
     _element.setAttribute( "data-butter-exclude", "true" );
     _element.className = "butter-tray";
+
+    _element.appendChild( _toggler.element );
 
     _areas.work = new Area( "work" );
     _areas.statusbar = new Area( "status-bar" );
@@ -9320,13 +9951,11 @@ define('ui/ui',[ "core/eventmanager", "./toggler", "./logo-spinner", "./context-
           if( _state !== val ){
             _state = val;
             if( _state ){
-              document.body.classList.remove( "minimized" );
-              _element.setAttribute( "ui-state", "visible" );
+              _element.classList.remove( "minimized" );
               _this.dispatch( "uivisibilitychanged", true );
             }
             else {
-              document.body.classList.add( "minimized" );
-              _element.setAttribute( "ui-state", "hidden" );
+              _element.classList.add( "minimized" );
               _this.dispatch( "uivisibilitychanged", false );
             } //if
           } //if
@@ -9526,11 +10155,256 @@ define('ui/ui',[ "core/eventmanager", "./toggler", "./logo-spinner", "./context-
 
     _this.dialogDir = butter.config.value( "dirs" ).dialogs || "";
 
-   } //UI
+  } //UI
 
   UI.__moduleName = "ui";
 
   return UI;
+
+});
+
+/* This Source Code Form is subject to the terms of the MIT license
+ * If a copy of the MIT license was not distributed with this file, you can
+ * obtain one at http://www.mozillapopcorn.org/butter-license.txt */
+
+define('util/shims',[], function(){
+
+  /*************************************************************************/
+  // Support createContextualFragment when missing (IE9)
+  if ( 'Range' in window &&
+       !Range.prototype.createContextualFragment ) {
+
+    // Implementation used under MIT License, http://code.google.com/p/rangy/
+    // Copyright (c) 2010 Tim Down
+
+    // Implementation as per HTML parsing spec, trusting in the browser's
+    // implementation of innerHTML. See discussion and base code for this
+    // implementation at issue 67. Spec:
+    // http://html5.org/specs/dom-parsing.html#extensions-to-the-range-interface
+    // Thanks to Aleks Williams.
+
+    var dom = {
+      getDocument: function getDocument( node ) {
+        if ( node.nodeType === 9 ) {
+          return node;
+        } else if ( typeof node.ownerDocument !== "undefined" ) {
+          return node.ownerDocument;
+        } else if ( typeof node.document !== "undefined" ) {
+          return node.document;
+        } else if ( node.parentNode ) {
+          return this.getDocument( node.parentNode );
+        } else {
+          throw "No document found for node.";
+        }
+      },
+
+      isCharacterDataNode: function( node ) {
+        var t = node.nodeType;
+        // Text, CDataSection or Comment
+        return t === 3 || t === 4 || t === 8;
+      },
+
+      parentElement: function( node ) {
+        var parent = node.parentNode;
+        return parent.nodeType === 1 ? parent : null;
+      },
+
+      isHtmlNamespace: function( node ) {
+        // Opera 11 puts HTML elements in the null namespace,
+        // it seems, and IE 7 has undefined namespaceURI
+        var ns;
+        return typeof node.namespaceURI === "undefined" ||
+               ( ( ns = node.namespaceURI ) === null ||
+                 ns === "http://www.w3.org/1999/xhtml" );
+      },
+
+      fragmentFromNodeChildren: function( node ) {
+        var fragment = this.getDocument( node ).createDocumentFragment(), child;
+        while ( !!( child = node.firstChild ) ) {
+          fragment.appendChild(child);
+        }
+        return fragment;
+      }
+    };
+
+    Range.prototype.createContextualFragment = function( fragmentStr ) {
+      // "Let node the context object's start's node."
+      var node = this.startContainer,
+        doc = dom.getDocument(node);
+
+      // "If the context object's start's node is null, raise an INVALID_STATE_ERR
+      // exception and abort these steps."
+      if (!node) {
+        throw new DOMException( "INVALID_STATE_ERR" );
+      }
+
+      // "Let element be as follows, depending on node's interface:"
+      // Document, Document Fragment: null
+      var el = null;
+
+      // "Element: node"
+      if ( node.nodeType === 1 ) {
+        el = node;
+
+      // "Text, Comment: node's parentElement"
+      } else if ( dom.isCharacterDataNode( node ) ) {
+        el = dom.parentElement( node );
+      }
+
+      // "If either element is null or element's ownerDocument is an HTML document
+      // and element's local name is "html" and element's namespace is the HTML
+      // namespace"
+      if ( el === null ||
+           ( el.nodeName === "HTML" &&
+             dom.isHtmlNamespace( dom.getDocument( el ).documentElement ) &&
+             dom.isHtmlNamespace( el )
+           )
+         ) {
+        // "let element be a new Element with "body" as its local name and the HTML
+        // namespace as its namespace.""
+        el = doc.createElement( "body" );
+      } else {
+        el = el.cloneNode( false );
+      }
+
+      // "If the node's document is an HTML document: Invoke the HTML fragment parsing algorithm."
+      // "If the node's document is an XML document: Invoke the XML fragment parsing algorithm."
+      // "In either case, the algorithm must be invoked with fragment as the input
+      // and element as the context element."
+      el.innerHTML = fragmentStr;
+
+      // "If this raises an exception, then abort these steps. Otherwise, let new
+      // children be the nodes returned."
+
+      // "Let fragment be a new DocumentFragment."
+      // "Append all new children to fragment."
+      // "Return fragment."
+      return dom.fragmentFromNodeChildren( el );
+    };
+  }
+  /*************************************************************************/
+
+  /***************************************************************************
+   * Cross-browser full element.classList implementation for IE9 and friends.
+   * 2011-06-15
+   *
+   * By Eli Grey, http://purl.eligrey.com/github/classList.js/blob/master/classList.js
+   * Public Domain.
+   * NO WARRANTY EXPRESSED OR IMPLIED. USE AT YOUR OWN RISK.
+   */
+  /*global self, document, DOMException */
+  if (typeof document !== "undefined" && !("classList" in document.createElement("a"))) {
+    (function (view) {
+      
+
+      var classListProp = "classList",
+        protoProp = "prototype",
+        elemCtrProto = (view.HTMLElement || view.Element)[protoProp],
+        objCtr = Object,
+        strTrim = String[protoProp].trim || function () {
+          return this.replace(/^\s+|\s+$/g, "");
+        },
+        arrIndexOf = Array[protoProp].indexOf || function (item) {
+          var i = 0,
+            len = this.length;
+          for (; i < len; i++) {
+            if (i in this && this[i] === item) {
+              return i;
+            }
+          }
+          return -1;
+        },
+        // Vendors: please allow content code to instantiate DOMExceptions
+        DOMEx = function (type, message) {
+          this.name = type;
+          this.code = DOMException[type];
+          this.message = message;
+        },
+        checkTokenAndGetIndex = function (classList, token) {
+          if (token === "") {
+            throw new DOMEx("SYNTAX_ERR", "An invalid or illegal string was specified");
+          }
+          if (/\s/.test(token)) {
+            throw new DOMEx("INVALID_CHARACTER_ERR", "String contains an invalid character");
+          }
+          return arrIndexOf.call(classList, token);
+        },
+        ClassList = function (elem) {
+          var trimmedClasses = strTrim.call(elem.className),
+            classes = trimmedClasses ? trimmedClasses.split(/\s+/) : [],
+            i = 0,
+            len = classes.length;
+          for (; i < len; i++) {
+            this.push(classes[i]);
+          }
+          this._updateClassName = function () {
+            elem.className = this.toString();
+          };
+        },
+        classListProto = ClassList[protoProp] = [],
+        classListGetter = function () {
+          return new ClassList(this);
+        };
+
+      // Most DOMException implementations don't allow calling DOMException's toString()
+      // on non-DOMExceptions. Error's toString() is sufficient here.
+      DOMEx[protoProp] = Error[protoProp];
+      classListProto.item = function (i) {
+        return this[i] || null;
+      };
+      classListProto.contains = function (token) {
+        token += "";
+        return checkTokenAndGetIndex(this, token) !== -1;
+      };
+      classListProto.add = function (token) {
+        token += "";
+        if (checkTokenAndGetIndex(this, token) === -1) {
+          this.push(token);
+          this._updateClassName();
+        }
+      };
+      classListProto.remove = function (token) {
+        token += "";
+        var index = checkTokenAndGetIndex(this, token);
+        if (index !== -1) {
+          this.splice(index, 1);
+          this._updateClassName();
+        }
+      };
+      classListProto.toggle = function (token) {
+        token += "";
+        if (checkTokenAndGetIndex(this, token) === -1) {
+          this.add(token);
+        } else {
+          this.remove(token);
+        }
+      };
+      classListProto.toString = function () {
+        return this.join(" ");
+      };
+
+      if (objCtr.defineProperty) {
+        var classListPropDesc = {
+          get: classListGetter,
+          enumerable: true,
+          configurable: true
+        };
+        try {
+          objCtr.defineProperty(elemCtrProto, classListProp, classListPropDesc);
+        } catch (ex) { // IE 8 doesn't support enumerable:true
+          if (ex.number === -0x7FF5EC54) {
+            classListPropDesc.enumerable = false;
+            objCtr.defineProperty(elemCtrProto, classListProp, classListPropDesc);
+          }
+        }
+      } else if (objCtr[protoProp].__defineGetter__) {
+        elemCtrProto.__defineGetter__(classListProp, classListGetter);
+      }
+    }(self));
+  }
+  /***************************************************************************/
+
+  return;
 
 });
 
@@ -9557,11 +10431,15 @@ define('ui/ui',[ "core/eventmanager", "./toggler", "./logo-spinner", "./context-
             "core/page",
             "./modules",
             "./dependencies",
+            "./dialogs",
+            "dialog/dialog",
+            "editor/editor",
             "ui/ui",
             "util/xhr",
             "util/lang",
             "text!default-config.json",
-            "text!layouts/ua-warning.html"
+            "text!layouts/ua-warning.html",
+            "util/shims"                  // keep this at the end so it doesn't need a spot in the function signature
           ],
           function(
             EventManagerWrapper,
@@ -9572,6 +10450,9 @@ define('ui/ui',[ "core/eventmanager", "./toggler", "./logo-spinner", "./context-
             Page,
             Modules,
             Dependencies,
+            Dialogs,
+            Dialog,
+            Editor,
             UI,
             XHR,
             Lang,
@@ -9645,6 +10526,10 @@ define('ui/ui',[ "core/eventmanager", "./toggler", "./logo-spinner", "./context-
 
       EventManagerWrapper( _this );
 
+      // Leave a reference on the instance to expose dialogs to butter users at runtime.
+      // Especially good for letting people use/create dialogs without being in the butter core.
+      this.dialog = Dialog;
+
       this.project = {
         id: null,
         name: null,
@@ -9676,13 +10561,13 @@ define('ui/ui',[ "core/eventmanager", "./toggler", "./logo-spinner", "./context-
         for( var i=0; i<_media.length; ++i ){
           media.push( _media[ i ].generatePopcornString() );
         } //for
-        
+
         return _page.getHTML( media );
       }; //getHTML
 
       function trackEventRequested( element, media, target ){
         var track,
-            type = element.getAttribute( "data-butter-plugin-type" ),
+            type = element.getAttribute( "data-popcorn-plugin-type" ),
             start = media.currentTime,
             end;
 
@@ -9918,8 +10803,7 @@ define('ui/ui',[ "core/eventmanager", "./toggler", "./logo-spinner", "./context-
           "tracktargetchanged",
           "trackeventadded",
           "trackeventremoved",
-          "trackeventupdated",
-          "trackeventeditrequested"
+          "trackeventupdated"
         ]);
 
         var trackEvents;
@@ -9964,8 +10848,7 @@ define('ui/ui',[ "core/eventmanager", "./toggler", "./logo-spinner", "./context-
             "tracktargetchanged",
             "trackeventadded",
             "trackeventremoved",
-            "trackeventupdated",
-            "trackeventeditrequested"
+            "trackeventupdated"
           ]);
           var tracks = media.tracks;
           for ( var i=0, l=tracks.length; i<l; ++i ) {
@@ -10349,6 +11232,8 @@ define('ui/ui',[ "core/eventmanager", "./toggler", "./logo-spinner", "./context-
       this.page = _page;
 
     }
+
+    Butter.Editor = Editor;
 
     Butter.instances = __instances;
 

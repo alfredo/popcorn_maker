@@ -23,7 +23,7 @@ h3 {
 }
 
 /*- - - Header - - -*/
-header { 
+header {
   position: relative;
   padding: 20px 0 15px 0;
   text-align: center;
@@ -77,7 +77,7 @@ section.video-container {
 }
 
 .text-overlay {
-  display: table; 
+  display: table;
   height: 100%;
 }
 
@@ -149,15 +149,15 @@ footer:hover a {
   line-height: 1;
 }
 .mid-title {
-  font-family: 'Fredericka the Great', Georgia; 
+  font-family: 'Fredericka the Great', Georgia;
   font-size: 35px;
   text-transform: uppercase;
   margin-top: 10px;
   letter-spacing: 0.1em;
 }
 .bottom-title {
-  font-family: 'Lovers Quarrel', Georgia; 
-  font-size: 80px; 
+  font-family: 'Lovers Quarrel', Georgia;
+  font-size: 80px;
   margin: 0 20px;
 }
 /* ---/ TITLES ------------------------------- */
