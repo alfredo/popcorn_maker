@@ -55,7 +55,7 @@ Amend ``popcorn_gallery/settings/local.py``  adding your details:
 
 - ADMINS: Add an email address and a name.
 - SECRET_KEY: This can be anything.
-- HMAC_KEYS: Uncomment or add your own key inside it.
+- HMAC_KEYS: Add your own key inside it.
 
 
 Updating the application

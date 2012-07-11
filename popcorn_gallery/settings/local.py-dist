@@ -50,7 +50,7 @@ DEV = True
 # # then switch this to bcrypt and pick a secret HMAC key for your application.
 PWD_ALGORITHM = 'bcrypt'
 HMAC_KEYS = {  # for bcrypt only
-    #'2011-01-01': 'cheesecake',
+    '2011-01-01': 'cheesecake',
 }
 
 # Make this unique, and don't share it with anybody.  It cannot be blank.

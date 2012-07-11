@@ -2,5 +2,7 @@
 # needed to run the site, it belongs in requirements/prod.txt. If it's a
 # package for developers (testing, docs, etc.), it goes in this file.
 # Documentation
-ipdb
-sphinx
+ipdb==0.6.1
+ipython==0.12.1
+Pygments==1.5
+Sphinx==1.1.3

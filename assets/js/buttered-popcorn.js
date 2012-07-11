@@ -1,5 +1,5 @@
 /*
- * popcorn.js version v1.2-244-gda087cb
+ * popcorn.js version v1.2-264-gf87c515
  * http://popcornjs.org
  *
  * Copyright 2011, Mozilla Foundation
@@ -2797,6 +2797,9 @@ if (typeof document !== "undefined" && !("classList" in document.createElement("
         if ( !target ) {
           target = createSubtitleContainer( this, options.target );
         }
+        else if ( [ "VIDEO", "AUDIO" ].indexOf( target.nodeName ) > -1 ) {
+          target = createSubtitleContainer( this, options.target + "-overlay" );
+        }
 
       } else if ( !this.container ) {
         // Creates a div for all subtitles to use
@@ -3002,21 +3005,23 @@ var googleCallback;
     // before setting up the map parameters
     var isMapReady = function () {
       if ( _mapLoaded ) {
-        if ( options.location ) {
-          // calls an anonymous google function called on separate thread
-          geocoder.geocode({
-            "address": options.location
-          }, function ( results, status ) {
-            if ( status === google.maps.GeocoderStatus.OK ) {
-              options.lat = results[ 0 ].geometry.location.lat();
-              options.lng = results[ 0 ].geometry.location.lng();
-              location = new google.maps.LatLng( options.lat, options.lng );
-              map = buildMap( options, location, newdiv );
-            }
-          });
-        } else {
-          location = new google.maps.LatLng( options.lat, options.lng );
-          map = buildMap( options, location, newdiv );
+        if ( newdiv ) {
+          if ( options.location ) {
+            // calls an anonymous google function called on separate thread
+            geocoder.geocode({
+              "address": options.location
+            }, function ( results, status ) {
+              if ( status === google.maps.GeocoderStatus.OK ) {
+                options.lat = results[ 0 ].geometry.location.lat();
+                options.lng = results[ 0 ].geometry.location.lng();
+                location = new google.maps.LatLng( options.lat, options.lng );
+                map = buildMap( options, location, newdiv );
+              }
+            });
+          } else {
+            location = new google.maps.LatLng( options.lat, options.lng );
+            map = buildMap( options, location, newdiv );
+          }
         }
       } else {
           setTimeout(function () {
@@ -3323,6 +3328,58 @@ var googleCallback;
       } )
  *
  */
+
+  var VIDEO_OVERLAY_Z = 2000,
+      CHECK_INTERVAL_DURATION = 10;
+
+  function trackMediaElement( mediaElement ) {
+    var checkInterval = -1,
+        container = document.createElement( "div" ),
+        videoZ = getComputedStyle( mediaElement ).zIndex;
+
+    container.setAttribute( "data-popcorn-helper-container", true );
+
+    container.style.position = "absolute";
+
+    if ( !isNaN( videoZ ) ) {
+      container.style.zIndex = videoZ + 1;
+    }
+    else {
+      container.style.zIndex = VIDEO_OVERLAY_Z;
+    }
+
+    document.body.appendChild( container );
+
+    function check() {
+      var mediaRect = mediaElement.getBoundingClientRect(),
+          containerRect = container.getBoundingClientRect();
+
+      if ( containerRect.left !== mediaRect.left ) {
+        container.style.left = mediaRect.left + "px";
+      }
+      if ( containerRect.top !== mediaRect.top ) {
+        container.style.top = mediaRect.top + "px";
+      }
+    }
+
+    return {
+      element: container,
+      start: function() {
+        checkInterval = setInterval( check, CHECK_INTERVAL_DURATION );
+      },
+      stop: function() {
+        clearInterval( checkInterval );
+        checkInterval = -1;
+      },
+      destroy: function() {
+        document.body.removeChild( container );
+        if ( checkInterval !== -1 ) {
+          clearInterval( checkInterval );
+        }
+      }
+    };
+  }
+
   Popcorn.plugin( "image", {
       manifest: {
         about: {
@@ -3373,12 +3430,22 @@ var googleCallback;
         options.anchor.style.textDecoration = "none";
         options.anchor.style.display = "none";
 
-
         if ( !target && Popcorn.plugin.debug ) {
           throw new Error( "target container doesn't exist" );
         }
-        // add the widget's div to the target div
-        target && target.appendChild( options.anchor );
+
+        // add the widget's div to the target div.
+        // if target is <video> or <audio>, create a container and routinely 
+        // update its size/position to be that of the media
+        if ( target ) {
+          if ( [ "VIDEO", "AUDIO" ].indexOf( target.nodeName ) > -1 ) {
+            options.trackedContainer = trackMediaElement( target );
+            options.trackedContainer.element.appendChild( options.anchor );
+          }
+          else {
+            target.appendChild( options.anchor );
+          }          
+        }
 
         img.addEventListener( "load", function() {
 
@@ -3428,6 +3495,9 @@ var googleCallback;
        */
       start: function( event, options ) {
         options.anchor.style.display = "inline";
+        if ( options.trackedContainer ) {
+          options.trackedContainer.start();
+        }
       },
       /**
        * @member image
@@ -3437,9 +3507,17 @@ var googleCallback;
        */
       end: function( event, options ) {
         options.anchor.style.display = "none";
+        if ( options.trackedContainer ) {
+          options.trackedContainer.stop();
+        }
       },
       _teardown: function( options ) {
-        document.getElementById( options.target ) && document.getElementById( options.target ).removeChild( options.anchor );
+        if ( options.trackedContainer ) {
+          options.trackedContainer.destroy();
+        }
+        else if ( options.anchor.parentNode ) {
+          options.anchor.parentNode.removeChild( options.anchor );
+        }
       }
   });
 })( Popcorn );
@@ -4282,13 +4360,20 @@ var wikiCallback;
 })( Popcorn );
 
 // A global callback for youtube... that makes me angry
-var onYouTubePlayerAPIReady = function() {
+window.onYouTubePlayerAPIReady = function() {
 
   onYouTubePlayerAPIReady.ready = true;
   for ( var i = 0; i < onYouTubePlayerAPIReady.waiting.length; i++ ) {
     onYouTubePlayerAPIReady.waiting[ i ]();
   }
 };
+
+// existing youtube references can break us.
+// remove it and use the one we can trust.
+if ( window.YT ) {
+  window.quarantineYT = window.YT;
+  window.YT = null;
+}
 
 onYouTubePlayerAPIReady.waiting = [];
 
@@ -4451,7 +4536,7 @@ Popcorn.player( "youtube", {
 
     var youtubeInit = function() {
 
-      var src, width, height, originalStyle, query;
+      var src, width, height, originalStyle, query, styleWidth, styleHeight;
 
       var timeUpdate = function() {
 
@@ -4508,14 +4593,20 @@ Popcorn.player( "youtube", {
 
       // setting youtube player's height and width, min 640 x 390,
       // anything smaller, and the player reports incorrect states.
-      height = media.clientHeight >= 390 ? "" + media.clientHeight : "390";
-      width = media.clientWidth >= 640 ? "" + media.clientWidth : "640";
+      styleHeight = parseFloat( media.style.height );
+      styleWidth = parseFloat( media.style.width );
+      height = styleHeight > media.clientHeight ? styleHeight : media.clientHeight;
+      width = styleWidth > media.clientWidth ? styleWidth : media.clientWidth;
+      height = height >= 390 ? height : "390";
+      width = width >= 640 ? width: "640";
       
       media.style.display = originalStyle;
 
       options.youtubeObject = new YT.Player( container.id, {
         height: height,
         width: width,
+        wmode: "transparent",
+        playerVars: { wmode: "transparent" },
         videoId: src,
         events: {
           "onReady": function(){

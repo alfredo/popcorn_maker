@@ -20,16 +20,13 @@ Vagrant::Config.run do |config|
     config.vm.box = "lucid32"
     config.vm.box_url = "http://files.vagrantup.com/lucid32.box"
 
-    config.vm.forward_port 80, 8000
-    config.vm.forward_port 8888, 8888
-
     if CONF['gui'] == true
-      config.vm.boot_mode = :gui
+        config.vm.boot_mode = :gui
     end
     # Increase vagrant's patience during hang-y CentOS bootup
     # see: https://github.com/jedi4ever/veewee/issues/14
     config.ssh.max_tries = 50
-    config.ssh.timeout   = 300
+    config.ssh.timeout   = 500
 
     # nfs needs to be explicitly enabled to run.
     if CONF['nfs'] == false or RUBY_PLATFORM =~ /mswin(32|64)/
@@ -45,7 +42,9 @@ Vagrant::Config.run do |config|
         puppet.manifests_path = "puppet/manifests"
         puppet.module_path = "puppet/modules"
         puppet.manifest_file  = "vagrant.pp"
-        # puppet.options = "--verbose --debug"
+        if CONF['debug'] == true
+            puppet.options = "--verbose --debug"
+        end
         puppet.facter = [
             ['username', CONF['username']],
             ['password', CONF['password']],

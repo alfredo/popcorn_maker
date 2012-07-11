@@ -16,22 +16,28 @@ class python ($project_path){
         require => Package[$packages],
       }
 
+      file { "$project_path/requirements/build":
+        ensure => "absent",
+        recurse => "true";
+      }
+
       exec { "pip-install-compiled":
         cwd => "$project_path/requirements",
         command => "pip install -r $project_path/requirements/compiled.txt",
-        require => Package[$packages],
+        require => [Package[$packages],
+                    File["$project_path/requirements/build"]],
       }
 
       exec { "pip-install-development":
         cwd => "$project_path/requirements",
         command => "pip install -r $project_path/requirements/dev.txt",
-        require => Package[$packages],
+        require => Exec["pip-install-compiled"],
       }
 
       exec { "install-project":
         cwd => "$project_path",
         command => "python $project_path/setup.py develop",
-        require => Package[$packages],
+        require => Exec["pip-install-development"],
       }
     }
   }

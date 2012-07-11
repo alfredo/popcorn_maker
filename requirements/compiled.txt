@@ -1,4 +1,8 @@
 -r ../vendor/src/funfactory/funfactory/requirements/compiled.txt
-fabric
+Fabric==1.4.2
+pycrypto==2.6
+pycurl==7.19.0
+ssh==1.7.14
+
 lxml
 PIL

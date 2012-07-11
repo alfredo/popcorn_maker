@@ -1,5 +1,6 @@
 # Configuration for Vagrant
 
+debug: false
 # Change to true if you can use nfs; using nfs significantly
 # improves performance.
 nfs: false
