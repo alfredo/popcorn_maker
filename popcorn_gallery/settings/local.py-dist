@@ -1,6 +1,6 @@
 # This is an example settings/local.py file.
 # These settings overrides what's in settings/base.py
-
+from django_sha2 import get_password_hashers
 from . import base
 
 # To extend any settings from settings/base.py here's an example:
@@ -53,6 +53,17 @@ HMAC_KEYS = {  # for bcrypt only
     '2011-01-01': 'cheesecake',
 }
 
+BASE_PASSWORD_HASHERS = (
+    'django_sha2.hashers.BcryptHMACCombinedPasswordVerifier',
+    'django_sha2.hashers.SHA512PasswordHasher',
+    'django_sha2.hashers.SHA256PasswordHasher',
+    'django.contrib.auth.hashers.SHA1PasswordHasher',
+    'django.contrib.auth.hashers.MD5PasswordHasher',
+    'django.contrib.auth.hashers.UnsaltedMD5PasswordHasher',
+)
+
+PASSWORD_HASHERS = get_password_hashers(BASE_PASSWORD_HASHERS, HMAC_KEYS)
+
 # Make this unique, and don't share it with anybody.  It cannot be blank.
 SECRET_KEY = ''
 
@@ -76,9 +87,9 @@ SECRET_KEY = ''
 
 
 # Used for the assertion with browserid
-SITE_URL = 'http://local.mozillapopcorn.org'
-# PROTOCOL=''
-# DOMAIN=''
+SITE_URL = 'https://local.mozillapopcorn.org'
+PROTOCOL= 'https'
+DOMAIN = 'local.mozillapopcorn.org'
 
 
 # Only internal IPs can access the API
@@ -96,3 +107,5 @@ CACHES = {
         'LOCATION': '127.0.0.1:11211',
     }
 }
+
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTOCOL', 'https')

@@ -1,4 +1,6 @@
 import logging
+
+from django_sha2 import get_password_hashers
 from .base import *
 
 
@@ -19,6 +21,7 @@ DEBUG = TEMPLATE_DEBUG = False
 # instances and False on stage/prod.
 DEV = True
 
+SECRET_KEY = 'test'
 # Playdoh ships with sha512 password hashing by default. Bcrypt+HMAC is safer,
 # so it is recommended. Please read <https://github.com/fwenzel/django-sha2#readme>,
 # then switch this to bcrypt and pick a secret HMAC key for your application.
@@ -26,6 +29,17 @@ PWD_ALGORITHM = 'bcrypt'
 HMAC_KEYS = { # for bcrypt only
     '2011-01-01': 'cheesecake',
 }
+
+BASE_PASSWORD_HASHERS = (
+    'django_sha2.hashers.BcryptHMACCombinedPasswordVerifier',
+    'django_sha2.hashers.SHA512PasswordHasher',
+    'django_sha2.hashers.SHA256PasswordHasher',
+    'django.contrib.auth.hashers.SHA1PasswordHasher',
+    'django.contrib.auth.hashers.MD5PasswordHasher',
+    'django.contrib.auth.hashers.UnsaltedMD5PasswordHasher',
+)
+
+PASSWORD_HASHERS = get_password_hashers(BASE_PASSWORD_HASHERS, HMAC_KEYS)
 
 # we need to test the mail that is sent.
 EXCLUDED_APPS = ('django_mailer',)

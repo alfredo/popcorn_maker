@@ -108,8 +108,6 @@ SUPPORTED_NONLOCALES = ['media', 'admin', 'api', 'static', 'browserid',
 
 STATIC_URL = '/static/'
 
-# admin is using the django.contrib.staticfiles
-ADMIN_MEDIA_PREFIX = STATIC_URL + 'admin/'
 
 STATIC_ROOT = path('static')
 
@@ -180,3 +178,7 @@ HAYSTACK_CONNECTIONS = {
 }
 
 MAX_STREAM_CHARS = 1024 * 100
+
+LOCALE_PATHS = (
+    path('popcorn_gallery', 'locale'),
+)
