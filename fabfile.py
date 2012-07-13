@@ -45,9 +45,7 @@ def syncdb():
 def copy_butter():
     print yellow('Coping Butter styling')
     with lcd(settings.PROJECT_ROOT):
-        local('cp -r butter/dist/* assets/dist/')
-        local('cp butter/dist/*.css assets/css/')
-        local('cp butter/dist/*.js assets/js/')
+        local('cp -r butter/dist/* assets/butter/')
 
 
 def update_index():
