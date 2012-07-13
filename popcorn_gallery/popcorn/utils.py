@@ -45,7 +45,7 @@ def list_popcorn_assets(butter_path):
 
 def list_butter_assets(butter_path):
     butter_paths = [
-        os.path.join(butter_path, 'dist'),
+        os.path.join(butter_path, 'butter'),
         ]
     return get_valid_file_list(butter_path, butter_paths, ['js', 'css'])
 

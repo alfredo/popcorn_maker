@@ -123,7 +123,7 @@ def _add_popcorn_plugins(document_tree, config):
     fix_url = lambda x: x.replace(' ','').replace(static_tag,
                                                   settings.STATIC_URL)
     head = document_tree.xpath('//head')[0]
-    popcorn = E.SCRIPT(src=settings.STATIC_URL+'dist/buttered-popcorn.min.js',
+    popcorn = E.SCRIPT(src=settings.STATIC_URL+'butter/buttered-popcorn.min.js',
                        type="text/javascript")
     head.append(popcorn)
     for plugin in config['plugin']['plugins']:
