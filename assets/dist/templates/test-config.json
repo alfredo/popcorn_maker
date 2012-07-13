@@ -1,6 +1,0 @@
-{
-  "name": "test",
-  "template": "test.html",
-  "savedDataUrl": "saved-data.json",
-  "baseDir": "../"
-}
